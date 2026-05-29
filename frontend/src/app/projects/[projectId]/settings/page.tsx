@@ -1,12 +1,15 @@
 import { AppShell } from "@/components/AppShell";
+import { ProjectSettingsForm } from "@/components/ProjectSettingsForm";
+import { serverApiFetch } from "@/lib/server-api";
+import type { Project } from "@/types";
 
-export default function SettingsPage() {
+export default async function SettingsPage({ params }: { params: Promise<{ projectId: string }> }) {
+  const { projectId } = await params;
+  const project = await serverApiFetch<Project>(`/projects/${projectId}`);
   return (
-    <AppShell>
+    <AppShell projectId={projectId}>
       <h1 className="mb-5 text-2xl font-semibold">Settings</h1>
-      <div className="rounded-md border border-border bg-white p-6 text-sm text-muted">
-        Project settings placeholder for retention, environments, and SDK setup notes.
-      </div>
+      <ProjectSettingsForm initialProject={project} />
     </AppShell>
   );
 }

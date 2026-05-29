@@ -85,6 +85,15 @@ class WebhookEventIn(BaseModel):
     timestamp: datetime | None = None
 
 
+class BatchIngestIn(BaseModel):
+    events: list[BaseEventIn] = Field(default_factory=list, max_length=100)
+    errors: list[ErrorEventIn] = Field(default_factory=list, max_length=100)
+    requests: list[ApiRequestEventIn] = Field(default_factory=list, max_length=100)
+    sessions: list[SessionEventIn] = Field(default_factory=list, max_length=100)
+    jobs: list[JobEventIn] = Field(default_factory=list, max_length=100)
+    webhooks: list[WebhookEventIn] = Field(default_factory=list, max_length=100)
+
+
 class EventOut(BaseModel):
     id: str
     project_id: str

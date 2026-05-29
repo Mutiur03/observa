@@ -24,6 +24,12 @@ class ProjectCreate(BaseModel):
     environment: str = Field(default="production", max_length=50)
 
 
+class ProjectUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=200)
+    slug: str | None = Field(default=None, min_length=2, max_length=120, pattern=r"^[a-z0-9-]+$")
+    environment: str | None = Field(default=None, max_length=50)
+
+
 class ProjectOut(BaseModel):
     id: str
     organization_id: str

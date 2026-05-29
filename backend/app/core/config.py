@@ -13,11 +13,14 @@ class Settings(BaseSettings):
     app_name: str = "Observa"
     environment: str = "development"
     api_v1_prefix: str = "/v1"
-    database_url: str = "postgresql+psycopg://observa:observa@localhost:5432/observa"
-    redis_url: str = "redis://localhost:6379/0"
+    database_url: str = "postgresql+psycopg://observa:observa@localhost:5435/observa"
+    redis_url: str = "redis://localhost:6380/0"
     jwt_secret_key: str = Field(default="change-me-in-production")
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24
+    auth_cookie_name: str = "observa_access_token"
+    auth_cookie_secure: bool = False
+    auth_cookie_samesite: str = "lax"
     cors_origins: List[AnyHttpUrl] | List[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",

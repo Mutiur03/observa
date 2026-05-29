@@ -46,3 +46,10 @@ class AlertRuleRepository:
 
     def list_for_project(self, project_id: str) -> list[AlertRule]:
         return list(self.db.scalars(select(AlertRule).where(AlertRule.project_id == project_id)))
+
+    def get(self, rule_id: str) -> AlertRule | None:
+        return self.db.get(AlertRule, rule_id)
+
+    def delete(self, rule: AlertRule) -> None:
+        self.db.delete(rule)
+        self.db.commit()

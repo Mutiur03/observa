@@ -17,6 +17,9 @@ class OrganizationRepository:
         self.db.refresh(organization)
         return organization
 
+    def get_by_slug(self, slug: str) -> Organization | None:
+        return self.db.scalar(select(Organization).where(Organization.slug == slug))
+
     def list_for_user(self, user_id: str) -> list[Organization]:
         query = (
             select(Organization)
@@ -40,6 +43,13 @@ class ProjectRepository:
 
     def get(self, project_id: str) -> Project | None:
         return self.db.get(Project, project_id)
+
+    def update(self, project: Project, data: dict) -> Project:
+        for field, value in data.items():
+            setattr(project, field, value)
+        self.db.commit()
+        self.db.refresh(project)
+        return project
 
     def list_for_user(self, user_id: str) -> list[Project]:
         query = (
@@ -71,6 +81,12 @@ class ApiKeyRepository:
 
     def list_for_project(self, project_id: str) -> list[ApiKey]:
         return list(self.db.scalars(select(ApiKey).where(ApiKey.project_id == project_id)))
+
+    def deactivate(self, project_id: str, key_id: str) -> None:
+        api_key = self.db.scalar(select(ApiKey).where(ApiKey.id == key_id, ApiKey.project_id == project_id))
+        if api_key:
+            api_key.is_active = False
+            self.db.commit()
 
     def find_active_by_prefix(self, key_prefix: str) -> list[ApiKey]:
         query = select(ApiKey).where(ApiKey.key_prefix == key_prefix, ApiKey.is_active.is_(True))

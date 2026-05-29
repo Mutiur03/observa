@@ -1,23 +1,48 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.auth import User
-from app.schemas.auth import TokenResponse, UserLogin, UserOut, UserRegister
+from app.schemas.auth import AuthSessionResponse, UserLogin, UserOut, UserRegister
 from app.services.auth import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=TokenResponse)
-def register(payload: UserRegister, db: Session = Depends(get_db)):
-    return AuthService(db).register(payload)
+def set_auth_cookie(response: Response, token: str) -> None:
+    settings = get_settings()
+    response.set_cookie(
+        key=settings.auth_cookie_name,
+        value=token,
+        max_age=settings.access_token_expire_minutes * 60,
+        httponly=True,
+        secure=settings.auth_cookie_secure,
+        samesite=settings.auth_cookie_samesite,
+        path="/",
+    )
 
 
-@router.post("/login", response_model=TokenResponse)
-def login(payload: UserLogin, db: Session = Depends(get_db)):
-    return AuthService(db).login(payload)
+@router.post("/register", response_model=AuthSessionResponse)
+def register(payload: UserRegister, response: Response, db: Session = Depends(get_db)):
+    token = AuthService(db).register(payload)
+    set_auth_cookie(response, token.access_token)
+    return AuthSessionResponse(user=token.user)
+
+
+@router.post("/login", response_model=AuthSessionResponse)
+def login(payload: UserLogin, response: Response, db: Session = Depends(get_db)):
+    token = AuthService(db).login(payload)
+    set_auth_cookie(response, token.access_token)
+    return AuthSessionResponse(user=token.user)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(response: Response):
+    response.delete_cookie(key=get_settings().auth_cookie_name, path="/")
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
 
 
 @router.get("/me", response_model=UserOut)

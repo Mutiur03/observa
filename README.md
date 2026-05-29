@@ -61,8 +61,12 @@ Services:
 | `DATABASE_URL` | PostgreSQL SQLAlchemy URL |
 | `REDIS_URL` | Redis URL |
 | `JWT_SECRET_KEY` | JWT signing secret |
+| `AUTH_COOKIE_NAME` | httpOnly auth cookie name |
+| `AUTH_COOKIE_SECURE` | Use secure cookies in production |
+| `AUTH_COOKIE_SAMESITE` | Cookie SameSite policy |
 | `CORS_ORIGINS` | Allowed frontend origins |
 | `NEXT_PUBLIC_API_URL` | Frontend API base URL |
+| `SERVER_API_URL` | Internal API URL used by Next.js server-side fetch |
 
 ## API Examples
 
@@ -90,6 +94,75 @@ curl -X POST http://localhost:8000/v1/events \
   -H "X-Observa-Key: <project-api-key>" \
   -H "Content-Type: application/json" \
   -d '{"event_type":"custom_event","event_name":"checkout_started","properties":{"plan":"pro"}}'
+```
+
+## SDK Integration
+
+The SDKs are local packages in this repository.
+
+Browser app:
+
+```bash
+npm install ./packages/observa-web
+```
+
+```ts
+import { init, identify, track, captureError, createTraceId } from "@observa/web";
+
+init({
+  apiKey: "obspk_YOUR_PUBLIC_KEY",
+  endpoint: "http://localhost:8000/v1",
+  environment: "production",
+});
+
+identify("user_123");
+const traceId = createTraceId();
+track("checkout_started", { plan: "pro" }, { traceId });
+```
+
+Plain browser snippet:
+
+```html
+<script src="/path/to/browser-snippet.js"></script>
+<script>
+  Observa.init({
+    apiKey: "obspk_YOUR_PUBLIC_KEY",
+    endpoint: "http://localhost:8000/v1",
+    environment: "production"
+  });
+  Observa.identify("user_123");
+  Observa.track("button_clicked", { button: "checkout" });
+</script>
+```
+
+Python/FastAPI:
+
+```bash
+pip install -e ./packages/observa-python
+```
+
+```python
+from observa import ObservaClient
+
+observa = ObservaClient("obssk_YOUR_SECRET_KEY", endpoint="http://localhost:8000/v1")
+app.middleware("http")(observa.fastapi_middleware())
+```
+
+Node/Express:
+
+```bash
+npm install ./packages/observa-node
+```
+
+```ts
+import { createObserva } from "@observa/node";
+
+const observa = createObserva({
+  apiKey: "obssk_YOUR_SECRET_KEY",
+  endpoint: "http://localhost:8000/v1",
+});
+
+app.use(observa.expressMiddleware());
 ```
 
 ## Roadmap

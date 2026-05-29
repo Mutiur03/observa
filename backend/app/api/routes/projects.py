@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -12,6 +12,7 @@ from app.schemas.organization import (
     OrganizationOut,
     ProjectCreate,
     ProjectOut,
+    ProjectUpdate,
 )
 from app.services.projects import OrganizationService, ProjectService
 
@@ -38,6 +39,21 @@ def list_projects(user: User = Depends(get_current_user), db: Session = Depends(
     return ProjectService(db).list_for_user(user)
 
 
+@router.get("/projects/{project_id}", response_model=ProjectOut)
+def get_project(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return ProjectService(db).get(project_id, user)
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectOut)
+def update_project(
+    project_id: str,
+    payload: ProjectUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return ProjectService(db).update(project_id, payload, user)
+
+
 @router.post("/projects/{project_id}/api-keys", response_model=ApiKeyCreated)
 def create_api_key(
     project_id: str,
@@ -45,11 +61,15 @@ def create_api_key(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _ = user
-    return ProjectService(db).create_key(project_id, payload)
+    return ProjectService(db).create_key(project_id, payload, user)
 
 
 @router.get("/projects/{project_id}/api-keys", response_model=list[ApiKeyOut])
 def list_api_keys(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    _ = user
-    return ProjectService(db).list_keys(project_id)
+    return ProjectService(db).list_keys(project_id, user)
+
+
+@router.delete("/projects/{project_id}/api-keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_api_key(project_id: str, key_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    ProjectService(db).revoke_key(project_id, key_id, user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

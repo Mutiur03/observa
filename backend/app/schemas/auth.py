@@ -35,3 +35,7 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+class AuthSessionResponse(BaseModel):
+    user: UserOut

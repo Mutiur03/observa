@@ -6,6 +6,13 @@ export type Project = {
   environment: string;
 };
 
+export type Organization = {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+};
+
 export type OverviewStats = {
   events: number;
   errors: number;

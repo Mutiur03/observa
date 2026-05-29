@@ -1,5 +1,5 @@
 {
-  "name": "@observa/web",
+  "name": "@observa/node",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "devDependencies": {
+    "@types/node": "^22.9.0",
     "typescript": "^5.6.3"
   }
 }

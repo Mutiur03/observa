@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.models.events import ApiRequestEvent, ErrorEvent, Event, JobEvent, SessionEvent, WebhookEvent
-from app.models.monitoring import MonitorCheck
+from app.models.monitoring import Monitor, MonitorCheck
 from app.repositories.events import EventRepository
 from app.schemas.dashboard import OverviewStats, TimelineItem
 
@@ -19,7 +19,12 @@ class DashboardService:
             sessions=self.events.count(SessionEvent, project_id),
             failed_jobs=self.db.query(JobEvent).filter_by(project_id=project_id, status="failed").count(),
             failed_webhooks=self.db.query(WebhookEvent).filter_by(project_id=project_id, is_success=False).count(),
-            monitor_down=self.db.query(MonitorCheck).filter_by(is_success=False).count(),
+            monitor_down=(
+                self.db.query(MonitorCheck)
+                .join(Monitor, Monitor.id == MonitorCheck.monitor_id)
+                .filter(Monitor.project_id == project_id, MonitorCheck.is_success.is_(False))
+                .count()
+            ),
         )
 
     def events_page(self, project_id: str, page: int, page_size: int, event_type: str | None):
