@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import auth, dashboard, ingestion, monitoring, projects
@@ -15,6 +15,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def ingestion_cors(request, call_next):
+    if request.url.path.startswith("/v1"):
+        if request.method == "OPTIONS":
+            headers = {
+                "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": request.headers.get(
+                    "access-control-request-headers",
+                    "Content-Type, X-Observa-Key, Authorization",
+                ),
+                "Access-Control-Max-Age": "86400",
+                "Vary": "Origin",
+            }
+            return Response(status_code=204, headers=headers)
+
+        response = await call_next(request)
+        response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
+        response.headers["Vary"] = "Origin"
+        return response
+
+    return await call_next(request)
 
 app.include_router(auth.router)
 app.include_router(projects.router)

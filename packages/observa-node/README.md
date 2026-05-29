@@ -15,13 +15,10 @@ import express from "express";
 import { createObserva } from "@observa/node";
 
 const app = express();
-const observa = createObserva("obssk_YOUR_SECRET_KEY");
-
-app.use(observa.expressMiddleware());
-
-// Keep this after your routes and before your final error response handler.
-app.use(observa.expressErrorMiddleware());
+createObserva("obssk_YOUR_SECRET_KEY").installExpress(app);
 ```
+
+That is all the setup needed. In development, the SDK automatically sends to `http://localhost:8000/v1`. In production, set `NODE_ENV=production` and it sends to `https://api.observa.dev/v1`.
 
 That automatically tracks:
 
@@ -44,14 +41,5 @@ OBSERVA_SECRET_KEY=obssk_YOUR_SECRET_KEY
 ```
 
 ```ts
-const observa = createObserva();
-```
-
-Self-hosted Observa:
-
-```ts
-const observa = createObserva({
-  apiKey: "obssk_YOUR_SECRET_KEY",
-  endpoint: "http://localhost:8000/v1",
-});
+createObserva().installExpress(app);
 ```

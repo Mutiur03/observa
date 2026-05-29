@@ -30,6 +30,9 @@ type ExpressResponse = {
 };
 
 type ExpressNext = (error?: unknown) => void;
+type ExpressApp = {
+  use(...handlers: unknown[]): unknown;
+};
 
 const HOSTED_ENDPOINT = "https://api.observa.dev/v1";
 const LOCAL_ENDPOINT = "http://localhost:8000/v1";
@@ -49,8 +52,8 @@ export class ObservaNode {
   constructor(input: string | ObservaOptions = {}) {
     const options = typeof input === "string" ? { apiKey: input } : input;
     this.apiKey = options.apiKey ?? process?.env?.OBSERVA_API_KEY ?? process?.env?.OBSERVA_SECRET_KEY;
-    this.endpoint = (options.endpoint ?? process?.env?.OBSERVA_ENDPOINT ?? defaultEndpoint()).replace(/\/$/, "");
-    this.environment = options.environment ?? process?.env?.OBSERVA_ENVIRONMENT ?? process?.env?.NODE_ENV ?? "production";
+    this.environment = options.environment ?? process?.env?.OBSERVA_ENVIRONMENT ?? process?.env?.NODE_ENV ?? "development";
+    this.endpoint = resolveEndpoint(options.endpoint ?? process?.env?.OBSERVA_ENDPOINT, this.environment);
     this.timeoutMs = options.timeoutMs ?? 3000;
   }
 
@@ -189,6 +192,23 @@ export class ObservaNode {
     };
   }
 
+  installExpress(app: ExpressApp, options: { getUserId?: (req: ExpressRequest) => string | undefined } = {}) {
+    const originalUse = app.use.bind(app);
+    const errorMiddleware = this.expressErrorMiddleware(options);
+    let errorMiddlewareInstalled = false;
+
+    app.use = (...handlers: unknown[]) => {
+      if (!errorMiddlewareInstalled && handlers.some(isExpressErrorHandler)) {
+        errorMiddlewareInstalled = true;
+        originalUse(errorMiddleware);
+      }
+      return originalUse(...handlers);
+    };
+
+    originalUse(this.expressMiddleware(options));
+    return this;
+  }
+
   async send(path: string, body: Record<string, unknown>) {
     if (!this.apiKey) return;
     const controller = new AbortController();
@@ -215,6 +235,14 @@ export function createObserva(input?: string | ObservaOptions) {
   return new ObservaNode(input);
 }
 
+export function instrumentExpress(
+  app: ExpressApp,
+  input?: string | ObservaOptions,
+  options: { getUserId?: (req: ExpressRequest) => string | undefined } = {},
+) {
+  return createObserva(input).installExpress(app, options);
+}
+
 function headerValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -227,6 +255,10 @@ function defaultUserId(req: ExpressRequest) {
 function normalizeError(error: unknown) {
   if (error instanceof Error) return error;
   return new Error(String(error));
+}
+
+function isExpressErrorHandler(value: unknown) {
+  return typeof value === "function" && value.length === 4;
 }
 
 function createTraceId() {
@@ -244,6 +276,11 @@ function fallbackId() {
   });
 }
 
-function defaultEndpoint() {
-  return process?.env?.NODE_ENV === "production" ? HOSTED_ENDPOINT : LOCAL_ENDPOINT;
+function resolveEndpoint(endpoint: string | undefined, environment: string) {
+  return (endpoint ?? defaultEndpoint(environment)).replace(/\/$/, "");
+}
+
+function defaultEndpoint(environment: string) {
+  if (environment !== "production") return LOCAL_ENDPOINT;
+  return HOSTED_ENDPOINT;
 }

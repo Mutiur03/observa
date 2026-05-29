@@ -1,3 +1,5 @@
+import json
+
 from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
@@ -30,7 +32,7 @@ def get_current_user(
     return user
 
 
-def get_project_id_from_api_key(
+async def get_project_id_from_api_key(
     request: Request,
     x_observa_key: str | None = Header(default=None, alias="X-Observa-Key"),
     authorization: str | None = Header(default=None),
@@ -40,6 +42,25 @@ def get_project_id_from_api_key(
     if not api_key and authorization and authorization.lower().startswith("bearer "):
         api_key = authorization.split(" ", 1)[1]
     if not api_key:
+        api_key = await get_api_key_from_body(request)
+    if not api_key:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing API key")
     rate_limit_ingestion(request, api_key)
     return IngestionService(db).resolve_project_id(api_key)
+
+
+async def get_api_key_from_body(request: Request) -> str | None:
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            payload = await request.json()
+        else:
+            raw = await request.body()
+            payload = json.loads(raw.decode("utf-8")) if raw else {}
+    except Exception:
+        return None
+
+    if isinstance(payload, dict):
+        value = payload.get("api_key") or payload.get("apiKey")
+        return value if isinstance(value, str) else None
+    return None

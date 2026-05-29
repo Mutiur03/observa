@@ -5,7 +5,7 @@ type AutoTrackOptions = {
   sessions?: boolean;
 };
 
-type InitOptions = {
+export type InitOptions = {
   apiKey: string;
   endpoint?: string;
   environment?: string;
@@ -17,7 +17,7 @@ type InitOptions = {
 type ResolvedConfig = Required<Omit<InitOptions, "userId" | "anonymousId" | "autoTrack">> &
   Pick<InitOptions, "userId" | "anonymousId"> & {
     autoTrack: Required<AutoTrackOptions>;
-  };
+};
 
 const HOSTED_ENDPOINT = "https://api.observa.dev/v1";
 const LOCAL_ENDPOINT = "http://localhost:8000/v1";
@@ -31,10 +31,11 @@ let nativeFetch: typeof fetch | null = null;
 
 export function init(input: string | InitOptions) {
   const options = typeof input === "string" ? { apiKey: input } : input;
+  const environment = options.environment ?? defaultEnvironment();
 
   config = {
-    endpoint: (options.endpoint ?? defaultEndpoint()).replace(/\/$/, ""),
-    environment: options.environment ?? "production",
+    endpoint: resolveEndpoint(options.endpoint, environment),
+    environment,
     apiKey: options.apiKey,
     userId: options.userId,
     anonymousId: options.anonymousId,
@@ -124,9 +125,12 @@ async function send(path: string, body: Record<string, unknown>) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Observa-Key": config.apiKey,
       },
-      body: JSON.stringify({ ...body, environment: config.environment }),
+      body: JSON.stringify({
+        ...body,
+        api_key: config.apiKey,
+        environment: config.environment,
+      }),
       keepalive: true,
     });
   } catch {
@@ -332,12 +336,59 @@ function debounce(fn: () => void, timeout: number) {
   };
 }
 
-function defaultEndpoint() {
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname.toLowerCase();
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".localhost")) {
-      return LOCAL_ENDPOINT;
-    }
-  }
+function resolveEndpoint(endpoint: string | undefined, environment: string) {
+  return (endpoint ?? defaultEndpoint(environment)).replace(/\/$/, "");
+}
+
+function defaultEndpoint(environment: string) {
+  if (environment !== "production" || isDevelopmentRuntime()) return LOCAL_ENDPOINT;
   return HOSTED_ENDPOINT;
+}
+
+function isLocalDevelopmentHost() {
+  if (typeof window === "undefined") return false;
+  const hostname = window.location.hostname.toLowerCase();
+  return isLocalHostname(hostname) || isPrivateIpv4(hostname) || isLikelyDevPort(window.location.port);
+}
+
+function defaultEnvironment() {
+  return isDevelopmentRuntime() ? "development" : "production";
+}
+
+function isDevelopmentRuntime() {
+  return isLocalDevelopmentHost() || isBundlerDevelopment();
+}
+
+function isBundlerDevelopment() {
+  const env = (import.meta as ImportMeta & {
+    env?: { DEV?: boolean; MODE?: string };
+  }).env;
+
+  return env?.DEV === true || env?.MODE === "development";
+}
+
+function isLocalHostname(hostname: string) {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname === "[::1]" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".test")
+  );
+}
+
+function isPrivateIpv4(hostname: string) {
+  const match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!match) return false;
+
+  const [a, b, c, d] = match.slice(1).map(Number);
+  if ([a, b, c, d].some((part) => part < 0 || part > 255)) return false;
+
+  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
+}
+
+function isLikelyDevPort(port: string) {
+  return ["3000", "3001", "3002", "4173", "5173", "5174", "5175", "5176", "5177", "8080"].includes(port);
 }

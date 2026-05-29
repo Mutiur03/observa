@@ -8,10 +8,11 @@
 
   function init(input) {
     var options = typeof input === "string" ? { apiKey: input } : input;
+    var environment = options.environment || defaultEnvironment();
     config = {
       apiKey: options.apiKey,
-      endpoint: (options.endpoint || defaultEndpoint()).replace(/\/$/, ""),
-      environment: options.environment || "production",
+      endpoint: resolveEndpoint(options.endpoint, environment),
+      environment: environment,
     };
     userId = options.userId || null;
     if (!installed) {
@@ -31,9 +32,8 @@
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Observa-Key": config.apiKey,
       },
-      body: JSON.stringify(Object.assign({ environment: config.environment }, body)),
+      body: JSON.stringify(Object.assign({ api_key: config.apiKey, environment: config.environment }, body)),
       keepalive: true,
     }).catch(function () {});
   }
@@ -162,12 +162,51 @@
     return created;
   }
 
-  function defaultEndpoint() {
-    var hostname = location.hostname.toLowerCase();
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.slice(-10) === ".localhost") {
-      return "http://localhost:8000/v1";
-    }
+  function resolveEndpoint(endpoint, environment) {
+    return (endpoint || defaultEndpoint(environment)).replace(/\/$/, "");
+  }
+
+  function defaultEndpoint(environment) {
+    if (environment !== "production" || isLocalDevelopmentHost()) return "http://localhost:8000/v1";
     return "https://api.observa.dev/v1";
+  }
+
+  function isLocalDevelopmentHost() {
+    var hostname = location.hostname.toLowerCase();
+    return isLocalHostname(hostname) || isPrivateIpv4(hostname) || isLikelyDevPort(location.port);
+  }
+
+  function defaultEnvironment() {
+    return isLocalDevelopmentHost() ? "development" : "production";
+  }
+
+  function isLocalHostname(hostname) {
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "[::1]" ||
+      hostname.slice(-10) === ".localhost" ||
+      hostname.slice(-6) === ".local" ||
+      hostname.slice(-5) === ".test"
+    );
+  }
+
+  function isPrivateIpv4(hostname) {
+    var match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!match) return false;
+
+    var a = Number(match[1]);
+    var b = Number(match[2]);
+    var c = Number(match[3]);
+    var d = Number(match[4]);
+    if ([a, b, c, d].some(function (part) { return part < 0 || part > 255; })) return false;
+
+    return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
+  }
+
+  function isLikelyDevPort(port) {
+    return ["3000", "3001", "3002", "4173", "5173", "5174", "5175", "5176", "5177", "8080"].indexOf(port) !== -1;
   }
 
   window.Observa = {
