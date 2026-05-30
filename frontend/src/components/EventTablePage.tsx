@@ -64,14 +64,24 @@ export function EventTablePage({
       }
     };
 
-    const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL as string) ?? "http://localhost:8000";
-    const WS_BASE_URL = API_BASE_URL.replace(/^http/i, "ws");
+    const getWsBaseUrl = () => {
+      const apiBase = (process.env.NEXT_PUBLIC_API_URL as string) || "";
+      if (apiBase.startsWith("http")) {
+        return apiBase.replace(/^http/i, "ws");
+      }
+      if (typeof window !== "undefined") {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host = window.location.host;
+        return `${protocol}//${host}${apiBase}`;
+      }
+      return "ws://localhost:8000";
+    };
 
     const connect = () => {
       if (!active) return;
       setConnectionState((current) => (current === "live" ? current : "connecting"));
       try {
-        const url = `${WS_BASE_URL}/dashboard/events/ws?project_id=${encodeURIComponent(projectId)}`;
+        const url = `${getWsBaseUrl()}/dashboard/events/ws?project_id=${encodeURIComponent(projectId)}`;
         socket = new WebSocket(url);
       } catch (err) {
         startPolling();

@@ -9,11 +9,21 @@ import type { OverviewStats } from "@/types";
 
 type ConnectionState = "connecting" | "live" | "reconnecting";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const WS_BASE_URL = API_BASE_URL.replace(/^http/i, "ws");
+function getWsBaseUrl() {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
+    if (apiBase.startsWith("http")) {
+        return apiBase.replace(/^http/i, "ws");
+    }
+    if (typeof window !== "undefined") {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host = window.location.host;
+        return `${protocol}//${host}${apiBase}`;
+    }
+    return "ws://localhost:8000";
+}
 
 function overviewWsUrl(projectId: string) {
-    return `${WS_BASE_URL}/dashboard/overview/ws?project_id=${encodeURIComponent(projectId)}`;
+    return `${getWsBaseUrl()}/dashboard/overview/ws?project_id=${encodeURIComponent(projectId)}`;
 }
 
 export function ProjectOverviewLive({ projectId, initialStats }: { projectId: string; initialStats: OverviewStats }) {
