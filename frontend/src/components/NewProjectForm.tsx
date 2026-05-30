@@ -51,35 +51,38 @@ export function NewProjectForm({ organizations }: { organizations: Organization[
   }
 
   return (
-    <form onSubmit={submit} className="mx-auto max-w-2xl rounded-md border border-border bg-surface p-6">
+    <form onSubmit={submit} className="mx-auto max-w-2xl rounded-3xl border border-border bg-surface/95 p-6 shadow-sm">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Create project</h1>
-        <button type="button" onClick={() => router.push("/projects")} className="rounded-md border border-border px-3 py-2 text-sm">Cancel</button>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Workspace</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">Create project</h1>
+        </div>
+        <button type="button" onClick={() => router.push("/projects")} className="rounded-full border border-border bg-surface px-3 py-2 text-sm">Cancel</button>
       </div>
-      <div className="mb-5 grid grid-cols-2 gap-2 rounded-md bg-surface-muted p-1">
-        <button type="button" disabled={!organizations.length} onClick={() => setMode("existing")} className={`rounded px-3 py-2 text-sm ${mode === "existing" ? "bg-surface text-ink shadow-sm" : "text-muted"} disabled:opacity-50`}>Existing organization</button>
-        <button type="button" onClick={() => setMode("new")} className={`rounded px-3 py-2 text-sm ${mode === "new" ? "bg-surface text-ink shadow-sm" : "text-muted"}`}>New organization</button>
+      <div className="mb-5 grid grid-cols-2 gap-2 rounded-2xl bg-surface-muted p-1">
+        <button type="button" disabled={!organizations.length} onClick={() => setMode("existing")} className={`rounded-2xl px-3 py-2 text-sm ${mode === "existing" ? "bg-surface text-ink shadow-sm" : "text-muted"} disabled:opacity-50`}>Existing organization</button>
+        <button type="button" onClick={() => setMode("new")} className={`rounded-2xl px-3 py-2 text-sm ${mode === "new" ? "bg-surface text-ink shadow-sm" : "text-muted"}`}>New organization</button>
       </div>
       {mode === "existing" ? (
         <label className="block text-sm font-medium">
           Organization
-          <select className="mt-1 w-full rounded-md border border-border px-3 py-2" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}>
+          <select className="mt-1 w-full rounded-2xl border border-border bg-surface px-3 py-2 outline-none focus:border-brand" value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}>
             {organizations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </label>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          <label className="block text-sm font-medium">Organization name<input className="mt-1 w-full rounded-md border border-border px-3 py-2" value={organization.name} onChange={(event) => setOrganization({ ...organization, name: event.target.value, slug: slugify(event.target.value) })} /></label>
-          <label className="block text-sm font-medium">Organization slug<input className="mt-1 w-full rounded-md border border-border px-3 py-2" value={orgSlug} onChange={(event) => setOrganization({ ...organization, slug: slugify(event.target.value) })} /></label>
+          <label className="block text-sm font-medium">Organization name<input className="mt-1 w-full rounded-2xl border border-border bg-surface px-3 py-2 outline-none focus:border-brand" value={organization.name} onChange={(event) => setOrganization({ ...organization, name: event.target.value, slug: slugify(event.target.value) })} /></label>
+          <label className="block text-sm font-medium">Organization slug<input className="mt-1 w-full rounded-2xl border border-border bg-surface px-3 py-2 outline-none focus:border-brand" value={orgSlug} onChange={(event) => setOrganization({ ...organization, slug: slugify(event.target.value) })} /></label>
         </div>
       )}
       <div className="mt-5 grid gap-3 md:grid-cols-2">
-        <label className="block text-sm font-medium">Project name<input className="mt-1 w-full rounded-md border border-border px-3 py-2" value={project.name} onChange={(event) => setProject({ ...project, name: event.target.value, slug: slugify(event.target.value) })} /></label>
-        <label className="block text-sm font-medium">Project slug<input className="mt-1 w-full rounded-md border border-border px-3 py-2" value={projectSlug} onChange={(event) => setProject({ ...project, slug: slugify(event.target.value) })} /></label>
-        <label className="block text-sm font-medium">Environment<select className="mt-1 w-full rounded-md border border-border px-3 py-2" value={project.environment} onChange={(event) => setProject({ ...project, environment: event.target.value })}><option value="production">Production</option><option value="staging">Staging</option><option value="development">Development</option></select></label>
+        <label className="block text-sm font-medium">Project name<input className="mt-1 w-full rounded-2xl border border-border bg-surface px-3 py-2 outline-none focus:border-brand" value={project.name} onChange={(event) => setProject({ ...project, name: event.target.value, slug: slugify(event.target.value) })} /></label>
+        <label className="block text-sm font-medium">Project slug<input className="mt-1 w-full rounded-2xl border border-border bg-surface px-3 py-2 outline-none focus:border-brand" value={projectSlug} onChange={(event) => setProject({ ...project, slug: slugify(event.target.value) })} /></label>
+        <label className="block text-sm font-medium">Environment<select className="mt-1 w-full rounded-2xl border border-border bg-surface px-3 py-2 outline-none focus:border-brand" value={project.environment} onChange={(event) => setProject({ ...project, environment: event.target.value })}><option value="production">Production</option><option value="staging">Staging</option><option value="development">Development</option></select></label>
       </div>
-      {error && <p className="mt-4 rounded-md border border-danger/20 bg-danger-soft p-3 text-sm text-danger">{error}</p>}
-      <button disabled={loading} className="mt-6 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong disabled:opacity-60">{loading ? "Creating..." : "Create project"}</button>
+      {error && <p className="mt-4 rounded-2xl border border-danger/20 bg-danger-soft p-3 text-sm text-danger">{error}</p>}
+      <button disabled={loading} className="mt-6 rounded-full bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong disabled:opacity-60">{loading ? "Creating..." : "Create project"}</button>
     </form>
   );
 }

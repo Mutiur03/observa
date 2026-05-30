@@ -24,6 +24,7 @@ type ExpressRequest = {
 
 type ExpressResponse = {
   statusCode: number;
+  writableEnded?: boolean;
   setHeader(name: string, value: string): void;
   getHeader(name: string): number | string | string[] | undefined;
   on(event: "finish", listener: () => void): void;
@@ -39,8 +40,8 @@ const LOCAL_ENDPOINT = "http://localhost:8000/v1";
 
 declare const process:
   | {
-      env?: Record<string, string | undefined>;
-    }
+    env?: Record<string, string | undefined>;
+  }
   | undefined;
 
 export class ObservaNode {
@@ -179,15 +180,24 @@ export class ObservaNode {
   expressErrorMiddleware(options: { getUserId?: (req: ExpressRequest) => string | undefined } = {}) {
     return (error: unknown, req: ExpressRequest, res: ExpressResponse, next: ExpressNext) => {
       const traceId = String(res.getHeader("X-Trace-Id") ?? headerValue(req.headers["x-trace-id"]) ?? this.createTraceId());
-      void this.captureError(error, {
-        traceId,
-        userId: options.getUserId?.(req) ?? defaultUserId(req),
-        properties: {
-          method: req.method,
-          path: req.originalUrl ?? req.path ?? req.url ?? "/",
-          status: res.statusCode,
-        },
-      });
+      const errorStatus = extractHttpStatus(error);
+      const capture = () => {
+        void this.captureError(error, {
+          traceId,
+          userId: options.getUserId?.(req) ?? defaultUserId(req),
+          properties: {
+            method: req.method,
+            path: req.originalUrl ?? req.path ?? req.url ?? "/",
+            status: errorStatus ?? (res.statusCode >= 400 ? res.statusCode : 500),
+          },
+        });
+      };
+
+      if (res.writableEnded) {
+        capture();
+      } else {
+        res.on("finish", capture);
+      }
       next(error);
     };
   }
@@ -250,6 +260,12 @@ function headerValue(value: string | string[] | undefined) {
 function defaultUserId(req: ExpressRequest) {
   const id = req.user?.id;
   return id === undefined ? undefined : String(id);
+}
+
+function extractHttpStatus(error: unknown) {
+  if (!error || typeof error !== "object") return undefined;
+  const candidate = (error as { statusCode?: unknown; status?: unknown }).statusCode ?? (error as { status?: unknown }).status;
+  return typeof candidate === "number" && candidate >= 100 && candidate <= 599 ? candidate : undefined;
 }
 
 function normalizeError(error: unknown) {

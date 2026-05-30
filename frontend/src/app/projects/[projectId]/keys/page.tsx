@@ -1,13 +1,8 @@
-import { AppShell } from "@/components/AppShell";
 import { ApiKeysPanel, type ApiKeyRow } from "@/components/ApiKeysPanel";
 import { serverApiFetch } from "@/lib/server-api";
 
 export default async function KeysPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
   const keys = await serverApiFetch<ApiKeyRow[]>(`/projects/${projectId}/api-keys`);
-  return (
-    <AppShell projectId={projectId}>
-      <ApiKeysPanel projectId={projectId} initialKeys={keys} />
-    </AppShell>
-  );
+  return <ApiKeysPanel projectId={projectId} initialKeys={keys} />;
 }

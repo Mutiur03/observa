@@ -20,3 +20,12 @@ class TimelineItem(BaseModel):
     name: str | None
     timestamp: datetime
     properties: dict[str, Any]
+
+
+class SessionSummaryItem(BaseModel):
+    session_id: str
+    user_id: str | None
+    anonymous_id: str | None
+    event_count: int
+    first_seen: datetime
+    last_seen: datetime

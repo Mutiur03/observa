@@ -31,12 +31,15 @@ class EventRepository:
         page: int,
         page_size: int,
         event_type: str | None = None,
+        session_id: str | None = None,
         start: datetime | None = None,
         end: datetime | None = None,
     ) -> tuple[list[Event], int]:
         query = select(Event).where(Event.project_id == project_id)
         if event_type:
             query = query.where(Event.event_type == event_type)
+        if session_id:
+            query = query.where(Event.session_id == session_id)
         query = self._date_filter(query, Event.timestamp, start, end)
         return self._paginate(query.order_by(Event.timestamp.desc()), page, page_size)
 
@@ -55,6 +58,24 @@ class EventRepository:
     def list_model(self, model: type, project_id: str, page: int, page_size: int) -> tuple[list[Any], int]:
         query = select(model).where(model.project_id == project_id).order_by(model.timestamp.desc())
         return self._paginate(query, page, page_size)
+
+    def list_sessions(self, project_id: str, page: int, page_size: int) -> tuple[list[dict[str, Any]], int]:
+        query = (
+            select(
+                Event.session_id.label("session_id"),
+                func.max(Event.user_id).label("user_id"),
+                func.max(Event.anonymous_id).label("anonymous_id"),
+                func.count().label("event_count"),
+                func.min(Event.timestamp).label("first_seen"),
+                func.max(Event.timestamp).label("last_seen"),
+            )
+            .where(Event.project_id == project_id, Event.session_id.isnot(None))
+            .group_by(Event.session_id)
+            .order_by(func.max(Event.timestamp).desc())
+        )
+        total = self.db.scalar(select(func.count()).select_from(query.subquery())) or 0
+        rows = list(self.db.execute(query.offset((page - 1) * page_size).limit(page_size)).mappings())
+        return rows, total
 
     def _paginate(self, query: Select, page: int, page_size: int) -> tuple[list[Any], int]:
         total = self.db.scalar(select(func.count()).select_from(query.subquery())) or 0

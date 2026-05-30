@@ -1,14 +1,27 @@
+import asyncio
+import logging
+
 from fastapi import APIRouter, Depends, Query
+from fastapi.websockets import WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.config import get_settings
+from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.auth import User
-from app.models.events import ApiRequestEvent, ErrorEvent, SessionEvent
+from app.models.events import ApiRequestEvent, ErrorEvent
+from app.db.session import SessionLocal
+from app.repositories.users import UserRepository
 from app.services.authorization import AuthorizationService
 from app.services.dashboard import DashboardService
+import json
+import redis.asyncio as aioredis
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+logger = logging.getLogger(__name__)
 
 
 @router.get("/overview")
@@ -17,17 +30,140 @@ def overview(project_id: str = Query(...), user: User = Depends(get_current_user
     return DashboardService(db).overview(project_id)
 
 
+@router.websocket("/overview/ws")
+async def overview_stream(websocket: WebSocket, project_id: str = Query(...)):
+    db = SessionLocal()
+    try:
+        logger.info("websocket connection attempt for project_id=%s", project_id)
+        token = websocket.cookies.get(get_settings().auth_cookie_name)
+        logger.debug("ws cookies: %s", websocket.cookies)
+        if not token:
+            # fallback: allow token via query param for JS clients if provided
+            token = websocket.query_params.get("token")
+            logger.debug("ws query token present: %s", bool(token))
+        if not token:
+            logger.warning("ws no auth cookie for project %s", project_id)
+            await websocket.close(code=1008)
+            return
+
+        user_id = decode_access_token(token)
+        logger.debug("ws decoded user id: %s", user_id)
+        if not user_id:
+            logger.warning("ws token invalid for project %s", project_id)
+            await websocket.close(code=1008)
+            return
+
+        user = UserRepository(db).get(user_id)
+        if not user or not user.is_active:
+            await websocket.close(code=1008)
+            return
+
+        AuthorizationService(db).require_project_role(project_id, user, "viewer")
+        await websocket.accept()
+        logger.info("ws accepted for user=%s project=%s", user_id, project_id)
+
+        service = DashboardService(db)
+        while True:
+            try:
+                data = service.overview(project_id).model_dump()
+                await websocket.send_json({"type": "overview", "data": data})
+            except Exception as exc:
+                logger.exception("ws send error for project %s: %s", project_id, exc)
+                # break loop on error to avoid noisy retry
+                break
+            await asyncio.sleep(2)
+    except WebSocketDisconnect:
+        pass
+    finally:
+        db.close()
+
+
+@router.websocket("/events/ws")
+async def events_stream(websocket: WebSocket, project_id: str = Query(...)):
+    db = SessionLocal()
+    try:
+        logger.info("events websocket connection attempt for project_id=%s", project_id)
+        token = websocket.cookies.get(get_settings().auth_cookie_name)
+        logger.debug("events ws cookies: %s", websocket.cookies)
+        if not token:
+            token = websocket.query_params.get("token")
+            logger.debug("events ws query token present: %s", bool(token))
+        if not token:
+            logger.warning("events ws no auth token for project %s", project_id)
+            await websocket.close(code=1008)
+            return
+
+        user_id = decode_access_token(token)
+        if not user_id:
+            await websocket.close(code=1008)
+            return
+
+        user = UserRepository(db).get(user_id)
+        if not user or not user.is_active:
+            await websocket.close(code=1008)
+            return
+
+        AuthorizationService(db).require_project_role(project_id, user, "viewer")
+        await websocket.accept()
+
+        settings = get_settings()
+        redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+        pubsub = redis.pubsub()
+        channel = f"project:{project_id}:events"
+        await pubsub.subscribe(channel)
+        logger.info("events ws subscribed user=%s project=%s", user_id, project_id)
+
+        try:
+            while True:
+                try:
+                    message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                except RedisTimeoutError:
+                    logger.debug("events ws redis timeout project=%s", project_id)
+                    continue
+                except asyncio.CancelledError:
+                    logger.info("events ws cancelled for project=%s", project_id)
+                    break
+                except Exception as exc:
+                    logger.exception("events ws get_message error for project=%s: %s", project_id, exc)
+                    await asyncio.sleep(0.5)
+                    continue
+
+                if message is None:
+                    continue
+
+                data_raw = message.get("data")
+                try:
+                    payload = json.loads(data_raw)
+                except Exception:
+                    payload = {"type": "unknown", "data": data_raw}
+
+                try:
+                    await websocket.send_json(payload)
+                except Exception as exc:
+                    logger.exception("events ws send failed: %s", exc)
+                    break
+        finally:
+            await pubsub.unsubscribe(channel)
+            await pubsub.close()
+            await redis.close()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        db.close()
+
+
 @router.get("/events")
 def events(
     project_id: str = Query(...),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
     event_type: str | None = None,
+    session_id: str | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     AuthorizationService(db).require_project_role(project_id, user, "viewer")
-    return DashboardService(db).events_page(project_id, page, page_size, event_type)
+    return DashboardService(db).events_page(project_id, page, page_size, event_type, session_id=session_id)
 
 
 @router.get("/errors")
@@ -45,7 +181,7 @@ def requests(project_id: str, page: int = 1, page_size: int = 25, user: User = D
 @router.get("/sessions")
 def sessions(project_id: str, page: int = 1, page_size: int = 25, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     AuthorizationService(db).require_project_role(project_id, user, "viewer")
-    return DashboardService(db).model_page(SessionEvent, project_id, page, page_size)
+    return DashboardService(db).sessions_page(project_id, page, page_size)
 
 
 @router.get("/users/{user_id}/timeline")

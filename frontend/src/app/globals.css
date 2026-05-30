@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 @theme {
-  --color-canvas: #f6f8fb;
-  --color-surface: #ffffff;
-  --color-surface-muted: #eef2f7;
-  --color-border: #d8dee8;
-  --color-ink: #172033;
-  --color-muted: #667085;
-  --color-brand: #2563eb;
-  --color-brand-strong: #1d4ed8;
+  --color-canvas: #f7f5f1;
+  --color-surface: #fffdfa;
+  --color-surface-muted: #f1ebe2;
+  --color-border: #e6dfd4;
+  --color-ink: #1f1f1a;
+  --color-muted: #726b60;
+  --color-brand: #111111;
+  --color-brand-strong: #2a2a2a;
   --color-danger: #b42318;
   --color-danger-soft: #fef3f2;
   --color-success: #027a48;
@@ -19,17 +19,34 @@
 
 :root {
   color-scheme: light;
-  background: #f6f8fb;
-  color: #172033;
+  background: #f7f5f1;
+  color: #1f1f1a;
+}
+
+html {
+  background: #f7f5f1;
 }
 
 body {
   margin: 0;
-  background: #f6f8fb;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.9), rgba(247, 245, 241, 0.96) 38%, rgba(241, 235, 226, 1) 100%);
+  color: #1f1f1a;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 button,
 input,
 select {
   font: inherit;
+}
+
+::selection {
+  background: rgba(17, 17, 17, 0.14);
+  color: #111111;
 }

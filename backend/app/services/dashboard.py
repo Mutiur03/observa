@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.models.events import ApiRequestEvent, ErrorEvent, Event, JobEvent, SessionEvent, WebhookEvent
 from app.models.monitoring import Monitor, MonitorCheck
 from app.repositories.events import EventRepository
-from app.schemas.dashboard import OverviewStats, TimelineItem
+from app.schemas.dashboard import OverviewStats, SessionSummaryItem, TimelineItem
 
 
 class DashboardService:
@@ -27,8 +27,8 @@ class DashboardService:
             ),
         )
 
-    def events_page(self, project_id: str, page: int, page_size: int, event_type: str | None):
-        items, total = self.events.paginate_events(project_id, page, page_size, event_type)
+    def events_page(self, project_id: str, page: int, page_size: int, event_type: str | None, session_id: str | None = None):
+        items, total = self.events.paginate_events(project_id, page, page_size, event_type, session_id=session_id)
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def model_page(self, model: type, project_id: str, page: int, page_size: int):
@@ -40,3 +40,18 @@ class DashboardService:
             TimelineItem(id=item.id, kind=item.event_type, name=item.event_name, timestamp=item.timestamp, properties=item.properties)
             for item in self.events.timeline_for_user(project_id, user_id)
         ]
+
+    def sessions_page(self, project_id: str, page: int, page_size: int):
+        rows, total = self.events.list_sessions(project_id, page, page_size)
+        items = [
+            SessionSummaryItem(
+                session_id=row["session_id"],
+                user_id=row["user_id"],
+                anonymous_id=row["anonymous_id"],
+                event_count=int(row["event_count"] or 0),
+                first_seen=row["first_seen"],
+                last_seen=row["last_seen"],
+            )
+            for row in rows
+        ]
+        return {"items": items, "total": total, "page": page, "page_size": page_size}

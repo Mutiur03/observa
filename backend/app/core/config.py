@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     app_name: str = "Observa"
     environment: str = "development"
     api_v1_prefix: str = "/v1"
-    database_url: str = "postgresql+psycopg://observa:observa@localhost:5435/observa"
-    redis_url: str = "redis://localhost:6380/0"
+    database_url: str = "postgresql+psycopg://observa:observa@127.0.0.1:5435/observa"
+    redis_url: str = "redis://127.0.0.1:6380/0"
     jwt_secret_key: str = Field(default="change-me-in-production")
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24

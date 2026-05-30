@@ -25,15 +25,17 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-md border border-border bg-surface p-6">
-        <h1 className="text-xl font-semibold">Create account</h1>
-        <input className="mt-5 w-full rounded-md border border-border px-3 py-2" placeholder="Full name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-        <input className="mt-3 w-full rounded-md border border-border px-3 py-2" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-        <input type="password" className="mt-3 w-full rounded-md border border-border px-3 py-2" placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+      <form onSubmit={submit} className="w-full max-w-sm rounded-3xl border border-border bg-surface/95 p-6 shadow-[0_16px_48px_rgba(17,17,17,0.06)] backdrop-blur">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Observa</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Create account</h1>
+        <p className="mt-2 text-sm text-muted">Start with a clean dashboard and a shared team workspace.</p>
+        <input className="mt-6 w-full rounded-2xl border border-border bg-surface px-3 py-2 outline-none transition-colors focus:border-brand" placeholder="Full name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+        <input className="mt-3 w-full rounded-2xl border border-border bg-surface px-3 py-2 outline-none transition-colors focus:border-brand" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <input type="password" className="mt-3 w-full rounded-2xl border border-border bg-surface px-3 py-2 outline-none transition-colors focus:border-brand" placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-        <button className="mt-5 w-full rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong">Register</button>
-        <p className="mt-4 text-sm text-muted">Have account? <Link className="text-brand" href="/login">Sign in</Link></p>
+        <button className="mt-5 w-full rounded-full bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong">Register</button>
+        <p className="mt-4 text-sm text-muted">Have account? <Link className="font-medium text-ink underline decoration-border underline-offset-4" href="/login">Sign in</Link></p>
       </form>
     </main>
   );

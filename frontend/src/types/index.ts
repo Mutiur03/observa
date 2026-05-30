@@ -33,3 +33,25 @@ export type EventRow = {
   timestamp: string;
   properties: Record<string, unknown>;
 };
+
+export type SessionEventRow = {
+  id: string;
+  project_id: string;
+  session_id: string;
+  user_id?: string | null;
+  anonymous_id?: string | null;
+  action: "start" | "end";
+  properties: Record<string, unknown>;
+  timestamp: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type SessionSummaryRow = {
+  session_id: string;
+  user_id?: string | null;
+  anonymous_id?: string | null;
+  event_count: number;
+  first_seen: string;
+  last_seen: string;
+};
