@@ -1,5 +1,5 @@
 {
-  "name": "@observa/node",
+  "name": "@mutiur03/observa-node",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
