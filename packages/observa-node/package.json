@@ -8,6 +8,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/observa-dev/observa.git",
+    "directory": "packages/observa-node"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "devDependencies": {
     "@types/node": "^22.9.0",
     "typescript": "^5.6.3"

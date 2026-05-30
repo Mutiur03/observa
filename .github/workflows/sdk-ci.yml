@@ -1,0 +1,77 @@
+name: SDK CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+  pull_request:
+    paths:
+      - "packages/**"
+
+jobs:
+  # ── TypeScript SDKs (Web + Node) ──────────────────────────────
+  build-js:
+    name: "Build JS SDKs"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package: [observa-web, observa-node]
+    defaults:
+      run:
+        working-directory: packages/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Verify dist output
+        run: |
+          if [ ! -f dist/index.js ]; then
+            echo "::error::dist/index.js not found — build produced no output"
+            exit 1
+          fi
+          if [ ! -f dist/index.d.ts ]; then
+            echo "::error::dist/index.d.ts not found — type declarations missing"
+            exit 1
+          fi
+          echo "✓ Build artifacts verified"
+
+  # ── Python SDK ────────────────────────────────────────────────
+  build-python:
+    name: "Build Python SDK"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/observa-python
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build
+
+      - name: Build sdist & wheel
+        run: python -m build
+
+      - name: Verify dist output
+        run: |
+          ls -la dist/
+          if [ ! "$(ls dist/*.whl 2>/dev/null)" ]; then
+            echo "::error::No .whl file found"
+            exit 1
+          fi
+          if [ ! "$(ls dist/*.tar.gz 2>/dev/null)" ]; then
+            echo "::error::No .tar.gz file found"
+            exit 1
+          fi
+          echo "✓ Python build artifacts verified"

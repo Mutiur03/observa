@@ -1,0 +1,60 @@
+name: Publish JS SDKs
+
+on:
+  push:
+    tags:
+      - "web-v*"   # e.g. web-v0.2.0
+      - "node-v*"  # e.g. node-v0.2.0
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: "Publish to GitHub Packages"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://npm.pkg.github.com"
+
+      # ── Determine which package to publish from the tag ──────
+      - name: Resolve package
+        id: meta
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          if [[ "$TAG" == web-v* ]]; then
+            echo "package=observa-web" >> "$GITHUB_OUTPUT"
+            echo "version=${TAG#web-v}" >> "$GITHUB_OUTPUT"
+          elif [[ "$TAG" == node-v* ]]; then
+            echo "package=observa-node" >> "$GITHUB_OUTPUT"
+            echo "version=${TAG#node-v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Unrecognized tag format: $TAG"
+            exit 1
+          fi
+
+      # ── Sync version from tag into package.json ──────────────
+      - name: Set version
+        working-directory: packages/${{ steps.meta.outputs.package }}
+        run: npm version "${{ steps.meta.outputs.version }}" --no-git-tag-version
+
+      # ── Build ────────────────────────────────────────────────
+      - name: Install dependencies
+        working-directory: packages/${{ steps.meta.outputs.package }}
+        run: npm ci
+
+      - name: Build
+        working-directory: packages/${{ steps.meta.outputs.package }}
+        run: npm run build
+
+      # ── Publish ──────────────────────────────────────────────
+      - name: Publish
+        working-directory: packages/${{ steps.meta.outputs.package }}
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -8,7 +8,8 @@ export default async function SessionDetailPage({
   params: Promise<{ projectId: string; sessionId: string }>;
 }) {
   const { projectId, sessionId } = await params;
-  const rows = await serverApiFetch<EventRow[]>(`/dashboard/events?project_id=${projectId}&session_id=${sessionId}`);
+  const data = await serverApiFetch<{ items: EventRow[] }>(`/dashboard/events?project_id=${projectId}&session_id=${sessionId}`);
+  const rows = data.items;
 
   return (
     <>

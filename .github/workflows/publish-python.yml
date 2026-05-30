@@ -1,0 +1,69 @@
+name: Publish Python SDK
+
+on:
+  push:
+    tags:
+      - "python-v*"  # e.g. python-v0.2.0
+
+permissions:
+  contents: write  # needed for creating the GitHub Release
+
+jobs:
+  publish:
+    name: "Build & Release"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/observa-python
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ── Resolve version from tag ─────────────────────────────
+      - name: Resolve version
+        id: meta
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#python-v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # ── Stamp version into pyproject.toml ────────────────────
+      - name: Set version
+        run: |
+          sed -i "s/^version = \".*\"/version = \"${{ steps.meta.outputs.version }}\"/" pyproject.toml
+          echo "Updated pyproject.toml:"
+          cat pyproject.toml
+
+      # ── Build ────────────────────────────────────────────────
+      - name: Install build tools
+        run: pip install build
+
+      - name: Build sdist & wheel
+        run: python -m build
+
+      # ── Create GitHub Release with artifacts ─────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "observa-python ${{ steps.meta.outputs.version }}"
+          body: |
+            ## Python SDK v${{ steps.meta.outputs.version }}
+
+            ### Install from this release
+
+            ```bash
+            pip install https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/observa_python-${{ steps.meta.outputs.version }}-py3-none-any.whl
+            ```
+
+            Or with a direct dependency in `requirements.txt`:
+            ```
+            observa-python @ https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/observa_python-${{ steps.meta.outputs.version }}-py3-none-any.whl
+            ```
+          files: |
+            packages/observa-python/dist/*
+          draft: false
+          prerelease: false
