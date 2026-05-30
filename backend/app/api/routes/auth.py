@@ -20,6 +20,7 @@ def set_auth_cookie(response: Response, token: str) -> None:
         httponly=True,
         secure=settings.auth_cookie_secure,
         samesite=settings.auth_cookie_samesite,
+        domain=settings.auth_cookie_domain,
         path="/",
     )
 
@@ -40,7 +41,12 @@ def login(payload: UserLogin, response: Response, db: Session = Depends(get_db))
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(response: Response):
-    response.delete_cookie(key=get_settings().auth_cookie_name, path="/")
+    settings = get_settings()
+    response.delete_cookie(
+        key=settings.auth_cookie_name,
+        path="/",
+        domain=settings.auth_cookie_domain,
+    )
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
 

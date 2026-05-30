@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     auth_cookie_name: str = "observa_access_token"
     auth_cookie_secure: bool = False
     auth_cookie_samesite: str = "lax"
+    auth_cookie_domain: str | None = None
     cors_origins: List[AnyHttpUrl] | List[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
