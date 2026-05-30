@@ -19,7 +19,7 @@ type ResolvedConfig = Required<Omit<InitOptions, "userId" | "anonymousId" | "aut
     autoTrack: Required<AutoTrackOptions>;
 };
 
-const HOSTED_ENDPOINT = "https://api.observa.dev/v1";
+const HOSTED_ENDPOINT = "https://observa-api.mutiurrahman.com/v1";
 const LOCAL_ENDPOINT = "http://localhost:8000/v1";
 
 let config: ResolvedConfig | null = null;

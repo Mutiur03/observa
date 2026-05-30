@@ -35,7 +35,7 @@ type ExpressApp = {
   use(...handlers: unknown[]): unknown;
 };
 
-const HOSTED_ENDPOINT = "https://api.observa.dev/v1";
+const HOSTED_ENDPOINT = "https://observa-api.mutiurrahman.com/v1";
 const LOCAL_ENDPOINT = "http://localhost:8000/v1";
 
 declare const process:
