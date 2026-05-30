@@ -41,7 +41,7 @@ jobs:
       # ── Sync version from tag into package.json ──────────────
       - name: Set version
         working-directory: packages/${{ steps.meta.outputs.package }}
-        run: npm version "${{ steps.meta.outputs.version }}" --no-git-tag-version
+        run: npm version "${{ steps.meta.outputs.version }}" --no-git-tag-version --allow-same-version
 
       # ── Build ────────────────────────────────────────────────
       - name: Install dependencies
