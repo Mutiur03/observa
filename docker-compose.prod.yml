@@ -21,6 +21,8 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       CORS_ORIGINS: ${CORS_ORIGINS:-'["*"]'}
       ENVIRONMENT: production
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-True}
+      AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-lax}
     depends_on:
       - postgres
       - redis
