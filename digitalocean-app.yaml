@@ -1,0 +1,82 @@
+# DigitalOcean App Platform Spec for Observa
+# Reference: https://docs.digitalocean.com/products/app-platform/reference/app-spec/
+
+spec:
+  name: observa
+  region: nyc
+  services:
+    # 1. Backend FastAPI Service
+    - name: backend
+      github:
+        repo: Mutiur03/observa
+        branch: main
+        deploy_on_push: true
+      dockerfile_path: backend/Dockerfile
+      source_dir: backend
+      envs:
+        - key: DATABASE_URL
+          scope: RUN_AND_BUILD_TIME
+          value: ${db.DATABASE_URL}
+        - key: REDIS_URL
+          scope: RUN_TIME
+          value: ${redis.REDIS_URL}
+        - key: JWT_SECRET_KEY
+          scope: RUN_TIME
+          value: ${uuid.gen}
+        - key: CORS_ORIGINS
+          scope: RUN_TIME
+          # Update this with your frontend's domain once deployed
+          value: '["*"]'
+        - key: ENVIRONMENT
+          scope: RUN_TIME
+          value: production
+      http_port: 8000
+      run_command: sh -c "alembic upgrade head && fastapi run app/main.py --port 8000"
+      instance_count: 1
+      instance_size_slug: basic-xxs
+      routes:
+        - path: /v1
+        - path: /auth
+        - path: /organizations
+        - path: /projects
+        - path: /docs
+        - path: /openapi.json
+
+    # 2. Frontend Next.js Service
+    - name: frontend
+      github:
+        repo: Mutiur03/observa
+        branch: main
+        deploy_on_push: true
+      dockerfile_path: frontend/Dockerfile
+      source_dir: frontend
+      build_arguments:
+        - key: NEXT_PUBLIC_API_URL
+          value: ${backend.PUBLIC_URL}
+      envs:
+        - key: NEXT_PUBLIC_API_URL
+          scope: RUN_AND_BUILD_TIME
+          value: ${backend.PUBLIC_URL}
+        - key: SERVER_API_URL
+          scope: RUN_TIME
+          value: http://backend:8000
+      http_port: 3000
+      instance_count: 1
+      instance_size_slug: basic-xxs
+      routes:
+        - path: /
+
+  databases:
+    # Managed PostgreSQL Database
+    - engine: pg
+      name: db
+      num_nodes: 1
+      size: db-s-dev-database
+      version: "16"
+
+    # Managed Redis Database (used for caching and rate limiting)
+    - engine: redis
+      name: redis
+      num_nodes: 1
+      size: db-s-dev-database
+      version: "7"
