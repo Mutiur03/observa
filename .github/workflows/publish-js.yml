@@ -46,7 +46,7 @@ jobs:
       # ── Build ────────────────────────────────────────────────
       - name: Install dependencies
         working-directory: packages/${{ steps.meta.outputs.package }}
-        run: npm ci
+        run: npm install
 
       - name: Build
         working-directory: packages/${{ steps.meta.outputs.package }}
