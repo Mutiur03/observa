@@ -7,6 +7,13 @@ import { LiveConnectionStatus } from "@/components/LiveConnectionStatus";
 import type { EventRow } from "@/types";
 import { apiFetch } from "@/lib/api";
 
+function isEventRow(value: unknown): value is EventRow {
+  if (!value || typeof value !== "object") return false;
+
+  const row = value as Partial<EventRow>;
+  return typeof row.event_type === "string" && typeof row.timestamp === "string" && !Number.isNaN(Date.parse(row.timestamp));
+}
+
 export function EventTablePage({
   rows: initialRows,
   title,
@@ -97,14 +104,15 @@ export function EventTablePage({
       socket.onmessage = (ev) => {
         if (!active) return;
         try {
-          const msg = JSON.parse(ev.data as string) as { type?: string; data?: EventRow };
-          if (msg && msg.type && msg.data) {
+          const msg = JSON.parse(ev.data as string) as { type?: string; data?: unknown };
+          if (msg && msg.type && isEventRow(msg.data)) {
+            const event = msg.data;
             // if a filter is active, ignore messages that don't match
-            if (currentType && msg.data.event_type && msg.data.event_type !== currentType) {
+            if (currentType && event.event_type !== currentType) {
               return;
             }
             // prepend new events
-            setRows((current) => [msg.data as EventRow, ...current]);
+            setRows((current) => [event, ...current]);
           }
         } catch (err) {
           console.debug("events ws message parse error", err);

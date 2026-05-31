@@ -25,6 +25,10 @@ class EventRepository:
         self.db.refresh(row)
         return row
 
+    def refresh(self, row):
+        self.db.refresh(row)
+        return row
+
     def paginate_events(
         self,
         project_id: str,

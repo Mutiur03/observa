@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Inter } from "next/font/google";
+import { Observa } from "@/components/Observa";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -9,9 +10,14 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const observaApiKey = process.env.NEXT_PUBLIC_OBSERVA_API_KEY;
+
   return (
     <html lang="en" className={inter.variable}>
-      <body className="bg-canvas text-ink antialiased">{children}</body>
+      <body className="bg-canvas text-ink antialiased">
+        {observaApiKey ? <Observa apiKey={observaApiKey} /> : null}
+        {children}
+      </body>
     </html>
   );
 }

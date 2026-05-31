@@ -38,7 +38,7 @@ class IngestionService:
             }
         )
 
-    def ingest_error(self, project_id: str, payload: ErrorEventIn) -> ErrorEvent:
+    def ingest_error(self, project_id: str, payload: ErrorEventIn) -> tuple[Event, ErrorEvent]:
         event = self.ingest_event(
             project_id,
             BaseEventIn(
@@ -51,14 +51,16 @@ class IngestionService:
                 timestamp=payload.timestamp,
             ),
         )
-        return self.events.add(ErrorEvent, {**payload.model_dump(), "project_id": project_id, "event_id": event.id})
+        detail = self.events.add(ErrorEvent, {**payload.model_dump(), "project_id": project_id, "event_id": event.id})
+        return self.events.refresh(event), detail
 
-    def ingest_request(self, project_id: str, payload: ApiRequestEventIn) -> ApiRequestEvent:
-        self.ingest_event(
+    def ingest_request(self, project_id: str, payload: ApiRequestEventIn) -> tuple[Event, ApiRequestEvent]:
+        event_name = self._request_event_name(payload.method, payload.path)
+        event = self.ingest_event(
             project_id,
             BaseEventIn(
                 event_type="api_request",
-                event_name=f"{payload.method.upper()} {payload.path}",
+                event_name=event_name,
                 user_id=payload.user_id,
                 session_id=payload.session_id,
                 trace_id=payload.trace_id,
@@ -66,10 +68,11 @@ class IngestionService:
                 timestamp=payload.timestamp,
             ),
         )
-        return self.events.add(ApiRequestEvent, {**payload.model_dump(), "project_id": project_id, "method": payload.method.upper()})
+        detail = self.events.add(ApiRequestEvent, {**payload.model_dump(), "project_id": project_id, "method": payload.method.upper()})
+        return self.events.refresh(event), detail
 
-    def ingest_session(self, project_id: str, payload: SessionEventIn) -> SessionEvent:
-        self.ingest_event(
+    def ingest_session(self, project_id: str, payload: SessionEventIn) -> tuple[Event, SessionEvent]:
+        event = self.ingest_event(
             project_id,
             BaseEventIn(
                 event_type="session_start" if payload.action == "start" else "session_end",
@@ -81,11 +84,12 @@ class IngestionService:
                 timestamp=payload.timestamp,
             ),
         )
-        return self.events.add(SessionEvent, {**payload.model_dump(), "project_id": project_id})
+        detail = self.events.add(SessionEvent, {**payload.model_dump(), "project_id": project_id})
+        return self.events.refresh(event), detail
 
-    def ingest_job(self, project_id: str, payload: JobEventIn) -> JobEvent:
+    def ingest_job(self, project_id: str, payload: JobEventIn) -> tuple[Event, JobEvent]:
         event_type = {"started": "job_started", "completed": "job_completed", "failed": "job_failed"}[payload.status]
-        self.ingest_event(
+        event = self.ingest_event(
             project_id,
             BaseEventIn(
                 event_type=event_type,
@@ -95,10 +99,11 @@ class IngestionService:
                 timestamp=payload.timestamp,
             ),
         )
-        return self.events.add(JobEvent, {**payload.model_dump(), "project_id": project_id})
+        detail = self.events.add(JobEvent, {**payload.model_dump(), "project_id": project_id})
+        return self.events.refresh(event), detail
 
-    def ingest_webhook(self, project_id: str, payload: WebhookEventIn) -> WebhookEvent:
-        self.ingest_event(
+    def ingest_webhook(self, project_id: str, payload: WebhookEventIn) -> tuple[Event, WebhookEvent]:
+        event = self.ingest_event(
             project_id,
             BaseEventIn(
                 event_type="webhook_delivery",
@@ -110,7 +115,19 @@ class IngestionService:
         )
         data = payload.model_dump()
         data["target_url"] = str(payload.target_url)
-        return self.events.add(WebhookEvent, {**data, "project_id": project_id})
+        detail = self.events.add(WebhookEvent, {**data, "project_id": project_id})
+        return self.events.refresh(event), detail
 
     def _now(self) -> datetime:
         return datetime.now(timezone.utc)
+
+    def _request_event_name(self, method: str, path: str) -> str:
+        prefix = f"{method.upper()} "
+        if len(prefix) + len(path) <= 200:
+            return f"{prefix}{path}"
+
+        route = path.split("?", 1)[0]
+        if len(prefix) + len(route) <= 200:
+            return f"{prefix}{route}"
+
+        return f"{prefix}{route[:200 - len(prefix) - 3]}..."

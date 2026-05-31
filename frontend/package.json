@@ -9,6 +9,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@mutiur03/observa-web": "file:../packages/observa-web/mutiur03-observa-web-0.1.1.tgz",
     "lucide-react": "^0.468.0",
     "next": "16.2.6",
     "react": "19.2.6",

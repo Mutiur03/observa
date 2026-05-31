@@ -5,6 +5,8 @@ type AutoTrackOptions = {
   sessions?: boolean;
 };
 
+export { Observa } from "./react";
+
 export type InitOptions = {
   apiKey: string;
   endpoint?: string;
@@ -17,7 +19,7 @@ export type InitOptions = {
 type ResolvedConfig = Required<Omit<InitOptions, "userId" | "anonymousId" | "autoTrack">> &
   Pick<InitOptions, "userId" | "anonymousId"> & {
     autoTrack: Required<AutoTrackOptions>;
-};
+  };
 
 const HOSTED_ENDPOINT = "https://observa-api.mutiurrahman.com/v1";
 const LOCAL_ENDPOINT = "http://localhost:8000/v1";
@@ -30,6 +32,7 @@ let installed = false;
 let nativeFetch: typeof fetch | null = null;
 
 export function init(input: string | InitOptions) {
+  if (!input) return;
   const options = typeof input === "string" ? { apiKey: input } : input;
   const environment = options.environment ?? defaultEnvironment();
 
@@ -146,7 +149,7 @@ function resolveAutoTrack(input: boolean | AutoTrackOptions | undefined): Requir
   return {
     pageViews: partial.pageViews ?? true,
     errors: partial.errors ?? true,
-    fetch: partial.fetch ?? true,
+    fetch: partial.fetch ?? false,
     sessions: partial.sessions ?? true,
   };
 }

@@ -19,7 +19,6 @@
       installed = true;
       installPageViews();
       installErrors();
-      installFetch();
       installSessions();
     }
     pageView();

@@ -24,6 +24,14 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 logger = logging.getLogger(__name__)
 
 
+def _is_event_payload(payload) -> bool:
+    if not isinstance(payload, dict):
+        return False
+
+    data = payload.get("data")
+    return isinstance(data, dict) and isinstance(data.get("event_type"), str) and data.get("timestamp") is not None
+
+
 @router.get("/overview")
 def overview(project_id: str = Query(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     AuthorizationService(db).require_project_role(project_id, user, "viewer")
@@ -67,6 +75,8 @@ async def overview_stream(websocket: WebSocket, project_id: str = Query(...)):
             try:
                 data = service.overview(project_id).model_dump()
                 await websocket.send_json({"type": "overview", "data": data})
+            except WebSocketDisconnect:
+                break
             except Exception as exc:
                 logger.exception("ws send error for project %s: %s", project_id, exc)
                 # break loop on error to avoid noisy retry
@@ -113,14 +123,26 @@ async def events_stream(websocket: WebSocket, project_id: str = Query(...)):
         await pubsub.subscribe(channel)
         logger.info("events ws subscribed user=%s project=%s", user_id, project_id)
 
+        disconnect_task = asyncio.create_task(websocket.receive())
         try:
             while True:
+                message_task = asyncio.create_task(pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0))
                 try:
-                    message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                    done, _ = await asyncio.wait(
+                        {disconnect_task, message_task},
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    if disconnect_task in done:
+                        message_task.cancel()
+                        await asyncio.gather(message_task, return_exceptions=True)
+                        break
+                    message = message_task.result()
                 except RedisTimeoutError:
                     logger.debug("events ws redis timeout project=%s", project_id)
                     continue
                 except asyncio.CancelledError:
+                    message_task.cancel()
+                    await asyncio.gather(message_task, return_exceptions=True)
                     logger.info("events ws cancelled for project=%s", project_id)
                     break
                 except Exception as exc:
@@ -137,12 +159,20 @@ async def events_stream(websocket: WebSocket, project_id: str = Query(...)):
                 except Exception:
                     payload = {"type": "unknown", "data": data_raw}
 
+                if not _is_event_payload(payload):
+                    logger.debug("events ws ignored malformed payload for project=%s", project_id)
+                    continue
+
                 try:
                     await websocket.send_json(payload)
+                except WebSocketDisconnect:
+                    break
                 except Exception as exc:
                     logger.exception("events ws send failed: %s", exc)
                     break
         finally:
+            disconnect_task.cancel()
+            await asyncio.gather(disconnect_task, return_exceptions=True)
             await pubsub.unsubscribe(channel)
             await pubsub.close()
             await redis.close()
