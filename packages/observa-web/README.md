@@ -25,7 +25,7 @@ http://localhost:8000/v1
 In production it automatically uses:
 
 ```ts
-https://api.observa.dev/v1
+https://observa-api.mutiurrahman.com/v1
 ```
 
 Advanced users can still override it:

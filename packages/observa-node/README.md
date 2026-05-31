@@ -18,7 +18,7 @@ const app = express();
 createObserva("obssk_YOUR_SECRET_KEY").installExpress(app);
 ```
 
-That is all the setup needed. In development, the SDK automatically sends to `http://localhost:8000/v1`. In production, set `NODE_ENV=production` and it sends to `https://api.observa.dev/v1`.
+That is all the setup needed. In development, the SDK automatically sends to `http://localhost:8000/v1`. In production, set `NODE_ENV=production` and it sends to `https://observa-api.mutiurrahman.com/v1`.
 
 That automatically tracks:
 

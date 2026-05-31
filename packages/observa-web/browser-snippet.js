@@ -167,7 +167,7 @@
 
   function defaultEndpoint(environment) {
     if (environment !== "production" || isLocalDevelopmentHost()) return "http://localhost:8000/v1";
-    return "https://api.observa.dev/v1";
+    return "https://observa-api.mutiurrahman.com/v1";
   }
 
   function isLocalDevelopmentHost() {

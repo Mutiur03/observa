@@ -18,6 +18,8 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-observa}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-observa}
       REDIS_URL: redis://redis:6379/0
+      OBSERVA_API_KEY: ${OBSERVA_API_KEY:-}
+      OBSERVA_ENDPOINT: ${OBSERVA_ENDPOINT:-http://127.0.0.1:8000/v1}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       CORS_ORIGINS: ${CORS_ORIGINS:-'["*"]'}
       ENVIRONMENT: production
