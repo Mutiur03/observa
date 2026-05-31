@@ -1,18 +1,18 @@
-# @observa/node
+# @mutiur03/observa-node
 
 Node.js SDK for Observa.
 
 ## Install
 
 ```bash
-npm install @observa/node
+npm install @mutiur03/observa-node
 ```
 
 ## Express
 
 ```ts
 import express from "express";
-import { createObserva } from "@observa/node";
+import { createObserva } from "@mutiur03/observa-node";
 
 const app = express();
 createObserva("obssk_YOUR_SECRET_KEY").installExpress(app);
@@ -26,6 +26,8 @@ That automatically tracks:
 - status codes and durations
 - generated `X-Trace-Id`
 - backend errors that reach Express error handling
+
+Request tracking records `source`, `client_ip`, and `user_agent`. Source resolution uses `Origin`, then `Referer`, then forwarded or direct client IP.
 
 ## Optional
 

@@ -22,7 +22,6 @@ if settings.observa_api_key:
     app.middleware("http")(
         observa.fastapi_middleware(
             exclude_path_prefixes=("/v1",),
-            properties={"source": "observa_backend"},
         )
     )
 

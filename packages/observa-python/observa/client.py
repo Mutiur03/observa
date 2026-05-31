@@ -138,6 +138,7 @@ class ObservaClient:
                 return await call_next(request)
 
             trace_id = request.headers.get("X-Trace-Id") or str(uuid4())
+            request_properties = _request_properties(request, properties)
             started = perf_counter()
             try:
                 response = await call_next(request)
@@ -150,7 +151,7 @@ class ObservaClient:
                         status_code=response.status_code,
                         duration_ms=duration_ms,
                         trace_id=trace_id,
-                        properties=properties,
+                        properties=request_properties,
                     )
                 )
                 response.headers["X-Trace-Id"] = trace_id
@@ -160,7 +161,7 @@ class ObservaClient:
                     _run_safely(
                         client.capture_exception,
                         exc,
-                        properties={"method": request.method, "path": _request_path(request), **(properties or {})},
+                        properties={"method": request.method, "path": _request_path(request), **request_properties},
                         trace_id=trace_id,
                     )
                 )
@@ -180,6 +181,20 @@ class ObservaClient:
 def _request_path(request) -> str:
     query = request.url.query
     return f"{request.url.path}?{query}" if query else request.url.path
+
+
+def _request_properties(request, properties: dict[str, Any] | None) -> dict[str, Any]:
+    client_ip = request.headers.get("X-Forwarded-For", "").split(",", 1)[0].strip()
+    if not client_ip and request.client:
+        client_ip = request.client.host
+
+    source = request.headers.get("Origin") or request.headers.get("Referer") or client_ip or "unknown"
+    return {
+        **(properties or {}),
+        "source": source,
+        "client_ip": client_ip or None,
+        "user_agent": request.headers.get("User-Agent"),
+    }
 
 
 async def _run_safely(function: Callable, *args, **kwargs) -> None:

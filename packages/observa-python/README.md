@@ -24,6 +24,8 @@ observa = ObservaClient(
 app.middleware("http")(observa.fastapi_middleware())
 ```
 
+Request tracking records `source`, `client_ip`, and `user_agent`. Source resolution uses `Origin`, then `Referer`, then forwarded or direct client IP.
+
 ## Manual Events
 
 ```python

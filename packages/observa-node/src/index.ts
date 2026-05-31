@@ -165,11 +165,7 @@ export class ObservaNode {
           durationMs: Math.round(performance.now() - started),
           traceId,
           userId: options.getUserId?.(req) ?? defaultUserId(req),
-          properties: {
-            ip: req.ip,
-            user_agent: req.headers["user-agent"],
-            host: req.headers.host,
-          },
+          properties: requestProperties(req),
         });
       });
 
@@ -260,6 +256,19 @@ function headerValue(value: string | string[] | undefined) {
 function defaultUserId(req: ExpressRequest) {
   const id = req.user?.id;
   return id === undefined ? undefined : String(id);
+}
+
+function requestProperties(req: ExpressRequest) {
+  const forwardedFor = headerValue(req.headers["x-forwarded-for"])?.split(",", 1)[0].trim();
+  const clientIp = forwardedFor || req.ip;
+  const source = headerValue(req.headers.origin) || headerValue(req.headers.referer) || clientIp || "unknown";
+
+  return {
+    source,
+    client_ip: clientIp,
+    user_agent: headerValue(req.headers["user-agent"]),
+    host: headerValue(req.headers.host),
+  };
 }
 
 function extractHttpStatus(error: unknown) {
