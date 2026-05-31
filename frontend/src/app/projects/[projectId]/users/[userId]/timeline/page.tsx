@@ -1,19 +1,9 @@
-import { DataTable } from "@/components/DataTable";
+import { EventTablePage } from "@/components/EventTablePage";
 import { serverApiFetch } from "@/lib/server-api";
 import type { EventRow } from "@/types";
 
 export default async function TimelinePage({ params }: { params: Promise<{ projectId: string; userId: string }> }) {
   const { projectId, userId } = await params;
-  const rows = await serverApiFetch<EventRow[]>(`/dashboard/users/${userId}/timeline?project_id=${projectId}`);
-
-  return (
-    <>
-      <h1 className="mb-5 text-2xl font-semibold">User Timeline</h1>
-      <DataTable rows={rows} empty="No timeline events." columns={[
-        { key: "type", label: "Type", render: (row) => row.event_type },
-        { key: "name", label: "Name", render: (row) => row.event_name ?? "-" },
-        { key: "time", label: "Time", render: (row) => new Date(row.timestamp).toLocaleString() },
-      ]} />
-    </>
-  );
+  const data = await serverApiFetch<{ items: EventRow[] }>(`/dashboard/events?project_id=${projectId}&user_id=${encodeURIComponent(userId)}`);
+  return <EventTablePage rows={data.items} title={`User ${userId}`} basePath={`/projects/${projectId}/users/${userId}/timeline`} projectId={projectId} filters={{ user_id: userId }} showTypeFilters={false} description="Live timeline for this identified user." />;
 }

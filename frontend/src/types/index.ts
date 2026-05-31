@@ -28,6 +28,7 @@ export type EventRow = {
   event_type: string;
   event_name?: string;
   user_id?: string;
+  anonymous_id?: string;
   session_id?: string;
   trace_id?: string;
   timestamp: string;

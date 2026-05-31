@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { DataTable } from "@/components/DataTable";
+import { SessionsTableLive } from "@/components/SessionsTableLive";
 import { serverApiFetch } from "@/lib/server-api";
 import type { SessionSummaryRow } from "@/types";
 
@@ -68,26 +67,7 @@ export default async function SessionsPage({ params }: { params: Promise<{ proje
         <p className="text-sm text-muted">Open a session to see every event collected inside it.</p>
       </div>
 
-      <DataTable
-        rows={sessions}
-        empty="No session activity yet. Once page views or events are tracked, sessions will appear here."
-        columns={[
-          {
-            key: "session",
-            label: "Session",
-            render: (row) => (
-              <Link className="font-medium text-ink underline decoration-border underline-offset-4" href={`/projects/${projectId}/sessions/${row.session_id}`}>
-                {row.session_id}
-              </Link>
-            ),
-          },
-          { key: "events", label: "Events", render: (row) => row.event_count },
-          { key: "user", label: "User", render: (row) => row.user_id ?? "-" },
-          { key: "anonymous", label: "Anonymous", render: (row) => row.anonymous_id ?? "-" },
-          { key: "first", label: "First seen", render: (row) => new Date(row.first_seen).toLocaleString() },
-          { key: "last", label: "Last seen", render: (row) => new Date(row.last_seen).toLocaleString() },
-        ]}
-      />
+      <SessionsTableLive projectId={projectId} initialRows={sessions} />
     </>
   );
 }

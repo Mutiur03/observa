@@ -42,6 +42,7 @@ class ApiRequestEvent(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "api_request_events"
 
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
+    event_id: Mapped[str | None] = mapped_column(ForeignKey("events.id", ondelete="SET NULL"), index=True)
     method: Mapped[str] = mapped_column(String(12), nullable=False)
     path: Mapped[str] = mapped_column(String(500), index=True, nullable=False)
     status_code: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
@@ -57,6 +58,7 @@ class SessionEvent(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "session_events"
 
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
+    event_id: Mapped[str | None] = mapped_column(ForeignKey("events.id", ondelete="SET NULL"), index=True)
     session_id: Mapped[str] = mapped_column(String(200), index=True, nullable=False)
     user_id: Mapped[str | None] = mapped_column(String(200), index=True)
     anonymous_id: Mapped[str | None] = mapped_column(String(200), index=True)
@@ -69,6 +71,7 @@ class JobEvent(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "job_events"
 
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
+    event_id: Mapped[str | None] = mapped_column(ForeignKey("events.id", ondelete="SET NULL"), index=True)
     job_name: Mapped[str] = mapped_column(String(200), index=True, nullable=False)
     status: Mapped[str] = mapped_column(String(30), index=True, nullable=False)
     duration_ms: Mapped[int | None] = mapped_column(Integer)
@@ -82,6 +85,7 @@ class WebhookEvent(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "webhook_events"
 
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True, nullable=False)
+    event_id: Mapped[str | None] = mapped_column(ForeignKey("events.id", ondelete="SET NULL"), index=True)
     webhook_name: Mapped[str] = mapped_column(String(200), index=True, nullable=False)
     target_url: Mapped[str] = mapped_column(String(1000), nullable=False)
     status_code: Mapped[int | None] = mapped_column(Integer)

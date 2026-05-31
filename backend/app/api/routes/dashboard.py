@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.websockets import WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from app.db.session import SessionLocal
 from app.repositories.users import UserRepository
 from app.services.authorization import AuthorizationService
 from app.services.dashboard import DashboardService
+from app.services.realtime import publish_project_update
 import json
 import redis.asyncio as aioredis
 from redis.exceptions import TimeoutError as RedisTimeoutError
@@ -24,12 +25,16 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 logger = logging.getLogger(__name__)
 
 
-def _is_event_payload(payload) -> bool:
+def _is_realtime_payload(payload) -> bool:
     if not isinstance(payload, dict):
         return False
 
     data = payload.get("data")
-    return isinstance(data, dict) and isinstance(data.get("event_type"), str) and data.get("timestamp") is not None
+    if payload.get("type") == "event.created":
+        return isinstance(data, dict) and isinstance(data.get("event_type"), str) and data.get("timestamp") is not None
+    if payload.get("type") in {"event.deleted", "events.deleted"}:
+        return isinstance(data, dict)
+    return False
 
 
 @router.get("/overview")
@@ -159,7 +164,7 @@ async def events_stream(websocket: WebSocket, project_id: str = Query(...)):
                 except Exception:
                     payload = {"type": "unknown", "data": data_raw}
 
-                if not _is_event_payload(payload):
+                if not _is_realtime_payload(payload):
                     logger.debug("events ws ignored malformed payload for project=%s", project_id)
                     continue
 
@@ -189,11 +194,65 @@ def events(
     page_size: int = Query(25, ge=1, le=100),
     event_type: str | None = None,
     session_id: str | None = None,
+    user_id: str | None = None,
+    anonymous_id: str | None = None,
+    trace_id: str | None = None,
+    search: str | None = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     AuthorizationService(db).require_project_role(project_id, user, "viewer")
-    return DashboardService(db).events_page(project_id, page, page_size, event_type, session_id=session_id)
+    return DashboardService(db).events_page(
+        project_id,
+        page,
+        page_size,
+        event_type,
+        session_id=session_id,
+        user_id=user_id,
+        anonymous_id=anonymous_id,
+        trace_id=trace_id,
+        search=search,
+    )
+
+
+@router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_event(
+    event_id: str,
+    project_id: str = Query(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    AuthorizationService(db).require_project_role(project_id, user, "member")
+    if DashboardService(db).events.delete_event(project_id, event_id):
+        publish_project_update(project_id, "event.deleted", {"id": event_id})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/events", status_code=status.HTTP_204_NO_CONTENT)
+def delete_events(
+    project_id: str = Query(...),
+    event_type: str | None = None,
+    session_id: str | None = None,
+    user_id: str | None = None,
+    anonymous_id: str | None = None,
+    trace_id: str | None = None,
+    search: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    AuthorizationService(db).require_project_role(project_id, user, "member")
+    ids = DashboardService(db).events.delete_events(
+        project_id,
+        event_type=event_type,
+        session_id=session_id,
+        user_id=user_id,
+        anonymous_id=anonymous_id,
+        trace_id=trace_id,
+        search=search,
+    )
+    if ids:
+        publish_project_update(project_id, "events.deleted", {"ids": ids})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/errors")

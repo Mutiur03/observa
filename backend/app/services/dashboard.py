@@ -27,8 +27,29 @@ class DashboardService:
             ),
         )
 
-    def events_page(self, project_id: str, page: int, page_size: int, event_type: str | None, session_id: str | None = None):
-        items, total = self.events.paginate_events(project_id, page, page_size, event_type, session_id=session_id)
+    def events_page(
+        self,
+        project_id: str,
+        page: int,
+        page_size: int,
+        event_type: str | None,
+        session_id: str | None = None,
+        user_id: str | None = None,
+        anonymous_id: str | None = None,
+        trace_id: str | None = None,
+        search: str | None = None,
+    ):
+        items, total = self.events.paginate_events(
+            project_id,
+            page,
+            page_size,
+            event_type,
+            session_id=session_id,
+            user_id=user_id,
+            anonymous_id=anonymous_id,
+            trace_id=trace_id,
+            search=search,
+        )
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def model_page(self, model: type, project_id: str, page: int, page_size: int):

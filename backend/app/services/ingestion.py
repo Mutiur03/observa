@@ -68,7 +68,7 @@ class IngestionService:
                 timestamp=payload.timestamp,
             ),
         )
-        detail = self.events.add(ApiRequestEvent, {**payload.model_dump(), "project_id": project_id, "method": payload.method.upper()})
+        detail = self.events.add(ApiRequestEvent, {**payload.model_dump(), "project_id": project_id, "event_id": event.id, "method": payload.method.upper()})
         return self.events.refresh(event), detail
 
     def ingest_session(self, project_id: str, payload: SessionEventIn) -> tuple[Event, SessionEvent]:
@@ -84,7 +84,7 @@ class IngestionService:
                 timestamp=payload.timestamp,
             ),
         )
-        detail = self.events.add(SessionEvent, {**payload.model_dump(), "project_id": project_id})
+        detail = self.events.add(SessionEvent, {**payload.model_dump(), "project_id": project_id, "event_id": event.id})
         return self.events.refresh(event), detail
 
     def ingest_job(self, project_id: str, payload: JobEventIn) -> tuple[Event, JobEvent]:
@@ -99,7 +99,7 @@ class IngestionService:
                 timestamp=payload.timestamp,
             ),
         )
-        detail = self.events.add(JobEvent, {**payload.model_dump(), "project_id": project_id})
+        detail = self.events.add(JobEvent, {**payload.model_dump(), "project_id": project_id, "event_id": event.id})
         return self.events.refresh(event), detail
 
     def ingest_webhook(self, project_id: str, payload: WebhookEventIn) -> tuple[Event, WebhookEvent]:
@@ -115,7 +115,7 @@ class IngestionService:
         )
         data = payload.model_dump()
         data["target_url"] = str(payload.target_url)
-        detail = self.events.add(WebhookEvent, {**data, "project_id": project_id})
+        detail = self.events.add(WebhookEvent, {**data, "project_id": project_id, "event_id": event.id})
         return self.events.refresh(event), detail
 
     def _now(self) -> datetime:

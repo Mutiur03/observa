@@ -1,4 +1,4 @@
-import { DataTable } from "@/components/DataTable";
+import { EventTablePage } from "@/components/EventTablePage";
 import { serverApiFetch } from "@/lib/server-api";
 import type { EventRow } from "@/types";
 
@@ -9,29 +9,5 @@ export default async function SessionDetailPage({
 }) {
   const { projectId, sessionId } = await params;
   const data = await serverApiFetch<{ items: EventRow[] }>(`/dashboard/events?project_id=${projectId}&session_id=${sessionId}`);
-  const rows = data.items;
-
-  return (
-    <>
-      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">Session detail</p>
-          <h1 className="mt-1 text-2xl font-semibold">{sessionId}</h1>
-        </div>
-        <p className="text-sm text-muted">All events captured in this session.</p>
-      </div>
-
-      <DataTable
-        rows={rows}
-        empty="No events found for this session."
-        columns={[
-          { key: "type", label: "Type", render: (row) => row.event_type ?? row.event_name ?? "event" },
-          { key: "name", label: "Name", render: (row) => row.event_name ?? "-" },
-          { key: "user", label: "User", render: (row) => row.user_id ?? "-" },
-          { key: "trace", label: "Trace", render: (row) => row.trace_id ?? "-" },
-          { key: "time", label: "Time", render: (row) => new Date(row.timestamp).toLocaleString() },
-        ]}
-      />
-    </>
-  );
+  return <EventTablePage rows={data.items} title={`Session ${sessionId}`} basePath={`/projects/${projectId}/sessions/${sessionId}`} projectId={projectId} filters={{ session_id: sessionId }} showTypeFilters={false} description="Live events captured inside this session." />;
 }
