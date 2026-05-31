@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from observa import ObservaClient
 
 from app.api.routes import auth, dashboard, ingestion, monitoring, projects
 from app.core.config import get_settings
@@ -15,6 +16,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+if settings.observa_api_key:
+    observa = ObservaClient(api_key=settings.observa_api_key, endpoint=settings.observa_endpoint)
+    app.middleware("http")(
+        observa.fastapi_middleware(
+            exclude_path_prefixes=("/v1",),
+            properties={"source": "observa_backend"},
+        )
+    )
 
 
 @app.middleware("http")

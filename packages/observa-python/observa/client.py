@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from time import perf_counter
 from typing import Any
@@ -125,29 +126,43 @@ class ObservaClient:
             },
         )
 
-    def fastapi_middleware(self) -> Callable:
+    def fastapi_middleware(
+        self,
+        exclude_path_prefixes: tuple[str, ...] = (),
+        properties: dict[str, Any] | None = None,
+    ) -> Callable:
         client = self
 
         async def middleware(request, call_next):
+            if request.url.path.startswith(exclude_path_prefixes):
+                return await call_next(request)
+
             trace_id = request.headers.get("X-Trace-Id") or str(uuid4())
             started = perf_counter()
             try:
                 response = await call_next(request)
                 duration_ms = int((perf_counter() - started) * 1000)
-                client.track_request(
-                    method=request.method,
-                    path=request.url.path,
-                    status_code=response.status_code,
-                    duration_ms=duration_ms,
-                    trace_id=trace_id,
+                asyncio.create_task(
+                    _run_safely(
+                        client.track_request,
+                        method=request.method,
+                        path=_request_path(request),
+                        status_code=response.status_code,
+                        duration_ms=duration_ms,
+                        trace_id=trace_id,
+                        properties=properties,
+                    )
                 )
                 response.headers["X-Trace-Id"] = trace_id
                 return response
             except Exception as exc:
-                client.capture_exception(
-                    exc,
-                    properties={"method": request.method, "path": request.url.path},
-                    trace_id=trace_id,
+                asyncio.create_task(
+                    _run_safely(
+                        client.capture_exception,
+                        exc,
+                        properties={"method": request.method, "path": _request_path(request), **(properties or {})},
+                        trace_id=trace_id,
+                    )
                 )
                 raise
 
@@ -160,3 +175,16 @@ class ObservaClient:
             headers={"X-Observa-Key": self.api_key},
             timeout=3,
         ).raise_for_status()
+
+
+def _request_path(request) -> str:
+    query = request.url.query
+    return f"{request.url.path}?{query}" if query else request.url.path
+
+
+async def _run_safely(function: Callable, *args, **kwargs) -> None:
+    try:
+        await asyncio.to_thread(function, *args, **kwargs)
+    except Exception:
+        # Observability must never break or add noise to the host app.
+        pass

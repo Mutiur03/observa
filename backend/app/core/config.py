@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     auth_cookie_secure: bool = False
     auth_cookie_samesite: str = "lax"
     auth_cookie_domain: str | None = None
+    observa_api_key: str | None = None
+    observa_endpoint: str = "http://127.0.0.1:8000/v1"
     cors_origins: List[AnyHttpUrl] | List[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",

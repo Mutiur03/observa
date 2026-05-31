@@ -60,6 +60,8 @@ Services:
 | --- | --- |
 | `DATABASE_URL` | PostgreSQL SQLAlchemy URL |
 | `REDIS_URL` | Redis URL |
+| `OBSERVA_API_KEY` | Secret project API key used by backend self-tracking |
+| `OBSERVA_ENDPOINT` | Observa ingestion base URL, defaults to `http://127.0.0.1:8000/v1` |
 | `JWT_SECRET_KEY` | JWT signing secret |
 | `AUTH_COOKIE_NAME` | httpOnly auth cookie name |
 | `AUTH_COOKIE_SECURE` | Use secure cookies in production |
