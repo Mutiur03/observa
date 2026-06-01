@@ -4,6 +4,7 @@ from app.models.events import ApiRequestEvent, ErrorEvent, Event, JobEvent, Sess
 from app.models.monitoring import Monitor, MonitorCheck
 from app.repositories.events import EventRepository
 from app.schemas.dashboard import OverviewStats, SessionSummaryItem, TimelineItem
+from app.services.presence import PresenceService
 
 
 class DashboardService:
@@ -12,7 +13,10 @@ class DashboardService:
         self.events = EventRepository(db)
 
     def overview(self, project_id: str) -> OverviewStats:
+        presence = PresenceService().snapshot(project_id)
         return OverviewStats(
+            online_users=presence.online_users,
+            active_sessions=presence.active_sessions,
             events=self.events.count(Event, project_id),
             errors=self.events.count(ErrorEvent, project_id),
             requests=self.events.count(ApiRequestEvent, project_id),

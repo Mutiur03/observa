@@ -88,6 +88,6 @@ class ApiKeyRepository:
             api_key.is_active = False
             self.db.commit()
 
-    def find_active_by_prefix(self, key_prefix: str) -> list[ApiKey]:
-        query = select(ApiKey).where(ApiKey.key_prefix == key_prefix, ApiKey.is_active.is_(True))
+    def find_active_by_prefixes(self, key_prefixes: set[str]) -> list[ApiKey]:
+        query = select(ApiKey).where(ApiKey.key_prefix.in_(key_prefixes), ApiKey.is_active.is_(True))
         return list(self.db.scalars(query))

@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 
-import { init } from "./index";
-import type { InitOptions } from "./index";
+import { init } from "./index.js";
+import type { InitOptions } from "./index.js";
 
 type ObservaProps = InitOptions;
 

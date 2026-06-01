@@ -8,6 +8,18 @@ Browser SDK for Observa.
 npm install @mutiur03/observa-web
 ```
 
+Inside Observa repository, switch dashboard frontend to local package source:
+
+```bash
+npm run web-package:dev
+```
+
+Restore released package:
+
+```bash
+npm run web-package:release
+```
+
 ## One-line Setup
 
 ```ts
@@ -51,6 +63,7 @@ That automatically tracks:
 - page views, including SPA route changes
 - frontend errors and unhandled promise rejections
 - session start/end events
+- active-user presence heartbeats every 20 seconds
 
 ## Optional
 

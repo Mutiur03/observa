@@ -1,7 +1,10 @@
+from pathlib import Path
+
 from fastapi import APIRouter, Depends
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_project_id_from_api_key
+from app.api.deps import get_project_id_from_api_key, get_project_id_from_secret_api_key
 from app.core.responses import success
 from app.db.session import get_db
 from app.schemas.events import (
@@ -13,10 +16,23 @@ from app.schemas.events import (
     SessionEventIn,
     WebhookEventIn,
 )
+from app.schemas.presence import PresenceHeartbeatIn
 from app.services.ingestion import IngestionService
+from app.services.presence import PresenceService
 from app.services.realtime import publish_project_update
 
 router = APIRouter(prefix="/v1", tags=["ingestion"])
+STATIC_DIR = Path(__file__).resolve().parents[2] / "static"
+
+
+@router.get("/presence.js", include_in_schema=False)
+def presence_script():
+    return FileResponse(STATIC_DIR / "observa-presence.js", media_type="application/javascript")
+
+
+@router.post("/presence")
+def presence(payload: PresenceHeartbeatIn, project_id: str = Depends(get_project_id_from_api_key)):
+    return PresenceService().heartbeat(project_id, payload)
 
 
 @router.post("/events")
@@ -34,7 +50,7 @@ def errors(payload: ErrorEventIn, project_id: str = Depends(get_project_id_from_
 
 
 @router.post("/requests")
-def requests(payload: ApiRequestEventIn, project_id: str = Depends(get_project_id_from_api_key), db: Session = Depends(get_db)):
+def requests(payload: ApiRequestEventIn, project_id: str = Depends(get_project_id_from_secret_api_key), db: Session = Depends(get_db)):
     event, detail = IngestionService(db).ingest_request(project_id, payload)
     publish_project_update(project_id, "event.created", event)
     return success({"id": detail.id})
@@ -48,21 +64,21 @@ def sessions(payload: SessionEventIn, project_id: str = Depends(get_project_id_f
 
 
 @router.post("/jobs")
-def jobs(payload: JobEventIn, project_id: str = Depends(get_project_id_from_api_key), db: Session = Depends(get_db)):
+def jobs(payload: JobEventIn, project_id: str = Depends(get_project_id_from_secret_api_key), db: Session = Depends(get_db)):
     event, detail = IngestionService(db).ingest_job(project_id, payload)
     publish_project_update(project_id, "event.created", event)
     return success({"id": detail.id})
 
 
 @router.post("/webhooks")
-def webhooks(payload: WebhookEventIn, project_id: str = Depends(get_project_id_from_api_key), db: Session = Depends(get_db)):
+def webhooks(payload: WebhookEventIn, project_id: str = Depends(get_project_id_from_secret_api_key), db: Session = Depends(get_db)):
     event, detail = IngestionService(db).ingest_webhook(project_id, payload)
     publish_project_update(project_id, "event.created", event)
     return success({"id": detail.id})
 
 
 @router.post("/batch")
-def batch(payload: BatchIngestIn, project_id: str = Depends(get_project_id_from_api_key), db: Session = Depends(get_db)):
+def batch(payload: BatchIngestIn, project_id: str = Depends(get_project_id_from_secret_api_key), db: Session = Depends(get_db)):
     service = IngestionService(db)
     counts = {"events": 0, "errors": 0, "requests": 0, "sessions": 0, "jobs": 0, "webhooks": 0}
 

@@ -11,6 +11,7 @@ export function ApiKeysPanel({ projectId, initialKeys }: { projectId: string; in
   const router = useRouter();
   const [keys, setKeys] = useState(initialKeys);
   const [createdKey, setCreatedKey] = useState("");
+  const [createdKeyType, setCreatedKeyType] = useState<"public" | "secret">();
   const [keyName, setKeyName] = useState("Browser SDK key");
   const [error, setError] = useState("");
 
@@ -22,6 +23,7 @@ export function ApiKeysPanel({ projectId, initialKeys }: { projectId: string; in
         body: JSON.stringify({ name: keyName || `${key_type} key`, key_type }),
       });
       setCreatedKey(key.key ?? "");
+      setCreatedKeyType(key_type);
       setKeys((current) => [key, ...current]);
       router.refresh();
     } catch (err) {
@@ -35,6 +37,11 @@ export function ApiKeysPanel({ projectId, initialKeys }: { projectId: string; in
     router.refresh();
   }
 
+  const presenceScriptUrl = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/v1/presence.js`;
+  const presenceSnippet = createdKeyType === "public" && createdKey
+    ? `<script src="${presenceScriptUrl}" data-api-key="${createdKey}" defer></script>`
+    : `<script src="${presenceScriptUrl}" data-api-key="obspk_YOUR_PUBLIC_KEY" defer></script>`;
+
   return (
     <>
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -47,6 +54,12 @@ export function ApiKeysPanel({ projectId, initialKeys }: { projectId: string; in
       </div>
       {createdKey && <div className="mb-4 rounded-md border border-info/20 bg-info-soft p-4 text-sm text-info">New key: <code>{createdKey}</code></div>}
       {error && <div className="mb-4 rounded-md border border-danger/20 bg-danger-soft p-4 text-sm text-danger">{error}</div>}
+      <div className="mb-4 rounded-xl border border-border bg-surface p-4 shadow-sm">
+        <h2 className="font-semibold">Website presence tracking</h2>
+        <p className="mt-1 text-sm text-muted">Add this one tag to your website. No SDK needed. It sends a heartbeat every 20 seconds and visitors expire after 60 seconds.</p>
+        <pre className="mt-3 overflow-x-auto rounded-md bg-ink p-3 text-xs text-white">{presenceSnippet}</pre>
+        <p className="mt-3 text-sm text-muted">After login, identify user with <code className="rounded bg-surface-muted px-1 py-0.5">window.ObservaPresence.identify("user_123")</code>.</p>
+      </div>
       <DataTable rows={keys} empty="No API keys yet." columns={[
         { key: "name", label: "Name", render: (row) => row.name },
         { key: "prefix", label: "Prefix", render: (row) => row.key_prefix },

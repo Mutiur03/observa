@@ -49,6 +49,23 @@ async def get_project_id_from_api_key(
     return IngestionService(db).resolve_project_id(api_key)
 
 
+async def get_project_id_from_secret_api_key(
+    request: Request,
+    x_observa_key: str | None = Header(default=None, alias="X-Observa-Key"),
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> str:
+    api_key = x_observa_key
+    if not api_key and authorization and authorization.lower().startswith("bearer "):
+        api_key = authorization.split(" ", 1)[1]
+    if not api_key:
+        api_key = await get_api_key_from_body(request)
+    if not api_key:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing API key")
+    rate_limit_ingestion(request, api_key)
+    return IngestionService(db).resolve_project_id(api_key, {"secret"})
+
+
 async def get_api_key_from_body(request: Request) -> str | None:
     try:
         content_type = request.headers.get("content-type", "")

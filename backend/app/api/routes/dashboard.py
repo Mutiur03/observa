@@ -6,7 +6,7 @@ from fastapi.websockets import WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.core.config import get_settings
+from app.core.config import get_settings, is_allowed_browser_origin
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models.auth import User
@@ -16,6 +16,7 @@ from app.repositories.users import UserRepository
 from app.services.authorization import AuthorizationService
 from app.services.dashboard import DashboardService
 from app.services.realtime import publish_project_update
+from app.services.presence import PresenceService
 import json
 import redis.asyncio as aioredis
 from redis.exceptions import TimeoutError as RedisTimeoutError
@@ -23,6 +24,13 @@ from redis.exceptions import TimeoutError as RedisTimeoutError
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 logger = logging.getLogger(__name__)
+
+
+async def _require_allowed_origin(websocket: WebSocket) -> bool:
+    if is_allowed_browser_origin(websocket.headers.get("origin")):
+        return True
+    await websocket.close(code=1008)
+    return False
 
 
 def _is_realtime_payload(payload) -> bool:
@@ -47,13 +55,10 @@ def overview(project_id: str = Query(...), user: User = Depends(get_current_user
 async def overview_stream(websocket: WebSocket, project_id: str = Query(...)):
     db = SessionLocal()
     try:
+        if not await _require_allowed_origin(websocket):
+            return
         logger.info("websocket connection attempt for project_id=%s", project_id)
         token = websocket.cookies.get(get_settings().auth_cookie_name)
-        logger.debug("ws cookies: %s", websocket.cookies)
-        if not token:
-            # fallback: allow token via query param for JS clients if provided
-            token = websocket.query_params.get("token")
-            logger.debug("ws query token present: %s", bool(token))
         if not token:
             logger.warning("ws no auth cookie for project %s", project_id)
             await websocket.close(code=1008)
@@ -97,12 +102,10 @@ async def overview_stream(websocket: WebSocket, project_id: str = Query(...)):
 async def events_stream(websocket: WebSocket, project_id: str = Query(...)):
     db = SessionLocal()
     try:
+        if not await _require_allowed_origin(websocket):
+            return
         logger.info("events websocket connection attempt for project_id=%s", project_id)
         token = websocket.cookies.get(get_settings().auth_cookie_name)
-        logger.debug("events ws cookies: %s", websocket.cookies)
-        if not token:
-            token = websocket.query_params.get("token")
-            logger.debug("events ws query token present: %s", bool(token))
         if not token:
             logger.warning("events ws no auth token for project %s", project_id)
             await websocket.close(code=1008)
@@ -184,6 +187,47 @@ async def events_stream(websocket: WebSocket, project_id: str = Query(...)):
     except WebSocketDisconnect:
         pass
     finally:
+        db.close()
+
+
+@router.get("/presence")
+def presence(project_id: str = Query(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    AuthorizationService(db).require_project_role(project_id, user, "viewer")
+    return PresenceService().snapshot(project_id)
+
+
+@router.websocket("/presence/ws")
+async def presence_stream(websocket: WebSocket, project_id: str = Query(...)):
+    db = SessionLocal()
+    redis = None
+    pubsub = None
+    try:
+        if not await _require_allowed_origin(websocket):
+            return
+        token = websocket.cookies.get(get_settings().auth_cookie_name)
+        user_id = decode_access_token(token) if token else None
+        user = UserRepository(db).get(user_id) if user_id else None
+        if not user or not user.is_active:
+            await websocket.close(code=1008)
+            return
+
+        AuthorizationService(db).require_project_role(project_id, user, "viewer")
+        await websocket.accept()
+
+        redis = aioredis.from_url(get_settings().redis_url, decode_responses=True)
+        pubsub = redis.pubsub()
+        await pubsub.subscribe(f"project:{project_id}:presence")
+        service = PresenceService()
+        while True:
+            await websocket.send_json({"type": "presence", "data": service.snapshot(project_id).model_dump(mode="json")})
+            await pubsub.get_message(ignore_subscribe_messages=True, timeout=5.0)
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if pubsub:
+            await pubsub.close()
+        if redis:
+            await redis.close()
         db.close()
 
 

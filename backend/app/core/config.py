@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import List
 
-from pydantic import AnyHttpUrl, Field, field_validator
+from pydantic import AnyHttpUrl, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +32,8 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3001",
     ]
     ingestion_rate_limit_per_minute: int = 120
+    ingestion_ip_rate_limit_per_minute: int = 600
+    auth_rate_limit_per_minute: int = 10
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -39,6 +41,18 @@ class Settings(BaseSettings):
         if isinstance(v, str) and v.startswith("postgresql://"):
             return v.replace("postgresql://", "postgresql+psycopg://", 1)
         return v
+
+    @model_validator(mode="after")
+    def validate_production_security(self):
+        if self.environment != "production":
+            return self
+        if self.jwt_secret_key == "change-me-in-production" or len(self.jwt_secret_key) < 32:
+            raise ValueError("JWT_SECRET_KEY must be a random value with at least 32 characters in production")
+        if not self.auth_cookie_secure:
+            raise ValueError("AUTH_COOKIE_SECURE must be true in production")
+        if "*" in {str(origin) for origin in self.cors_origins}:
+            raise ValueError("CORS_ORIGINS cannot contain '*' in production")
+        return self
 
     model_config = SettingsConfigDict(
         env_file=BACKEND_DIR / ".env",
@@ -51,3 +65,10 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def is_allowed_browser_origin(origin: str | None) -> bool:
+    if not origin:
+        return True
+    allowed = {str(item).rstrip("/") for item in get_settings().cors_origins}
+    return origin.rstrip("/") in allowed

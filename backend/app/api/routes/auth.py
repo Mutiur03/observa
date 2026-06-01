@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.config import get_settings
+from app.core.rate_limit import rate_limit_auth
 from app.db.session import get_db
 from app.models.auth import User
 from app.schemas.auth import AuthSessionResponse, UserLogin, UserOut, UserRegister
@@ -26,14 +27,16 @@ def set_auth_cookie(response: Response, token: str) -> None:
 
 
 @router.post("/register", response_model=AuthSessionResponse)
-def register(payload: UserRegister, response: Response, db: Session = Depends(get_db)):
+def register(payload: UserRegister, request: Request, response: Response, db: Session = Depends(get_db)):
+    rate_limit_auth(request, "register")
     token = AuthService(db).register(payload)
     set_auth_cookie(response, token.access_token)
     return AuthSessionResponse(user=token.user)
 
 
 @router.post("/login", response_model=AuthSessionResponse)
-def login(payload: UserLogin, response: Response, db: Session = Depends(get_db)):
+def login(payload: UserLogin, request: Request, response: Response, db: Session = Depends(get_db)):
+    rate_limit_auth(request, "login")
     token = AuthService(db).login(payload)
     set_auth_cookie(response, token.access_token)
     return AuthSessionResponse(user=token.user)

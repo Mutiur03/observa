@@ -14,6 +14,8 @@ export type Organization = {
 };
 
 export type OverviewStats = {
+  online_users: number;
+  active_sessions: number;
   events: number;
   errors: number;
   requests: number;
@@ -21,6 +23,24 @@ export type OverviewStats = {
   failed_jobs: number;
   failed_webhooks: number;
   monitor_down: number;
+};
+
+export type PresenceVisitor = {
+  user_id?: string | null;
+  anonymous_id: string;
+  session_id: string;
+  path?: string | null;
+  url?: string | null;
+  title?: string | null;
+  last_seen: string;
+};
+
+export type PresenceSnapshot = {
+  online_users: number;
+  identified_users: number;
+  anonymous_users: number;
+  active_sessions: number;
+  visitors: PresenceVisitor[];
 };
 
 export type EventRow = {

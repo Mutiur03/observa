@@ -1,9 +1,9 @@
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from observa import ObservaClient
 
 from app.api.routes import auth, dashboard, ingestion, monitoring, projects
-from app.core.config import get_settings
+from app.core.config import get_settings, is_allowed_browser_origin
 
 settings = get_settings()
 
@@ -11,7 +11,7 @@ app = FastAPI(title=settings.app_name, version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[str(origin) for origin in settings.cors_origins],
+    allow_origins=[str(origin).rstrip("/") for origin in settings.cors_origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,6 +47,14 @@ async def ingestion_cors(request, call_next):
         response.headers["Vary"] = "Origin"
         return response
 
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def dashboard_origin_guard(request, call_next):
+    if request.method not in {"GET", "HEAD", "OPTIONS"} and not request.url.path.startswith("/v1"):
+        if not is_allowed_browser_origin(request.headers.get("origin")):
+            return Response(status_code=status.HTTP_403_FORBIDDEN)
     return await call_next(request)
 
 app.include_router(auth.router)

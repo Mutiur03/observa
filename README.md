@@ -70,6 +70,16 @@ Services:
 | `NEXT_PUBLIC_API_URL` | Frontend API base URL |
 | `SERVER_API_URL` | Internal API URL used by Next.js server-side fetch |
 
+## Production Security
+
+- Set a random `JWT_SECRET_KEY` with at least 32 characters.
+- Set explicit `CORS_ORIGINS`; production startup rejects wildcard origins.
+- Keep `AUTH_COOKIE_SECURE=true` behind HTTPS.
+- Use public `obspk_` keys only for browser events, errors, sessions, and presence. Treat browser telemetry as untrusted input.
+- Use secret `obssk_` keys for API requests, jobs, webhooks, and batch ingestion.
+- Rotate keys created before unique lookup prefixes were added. New keys reduce invalid-key bcrypt work during abuse.
+- Keep PostgreSQL and Redis on private networks. Add Redis authentication when sharing an infrastructure network.
+
 ## API Examples
 
 Register:
@@ -101,6 +111,32 @@ curl -X POST http://localhost:8000/v1/events \
 ## SDK Integration
 
 The SDKs are local packages in this repository.
+
+### Switch Browser Package Mode
+
+Dashboard frontend can use released browser package or local development package.
+
+Use local `packages/observa-web` source while developing:
+
+```bash
+npm run web-package:dev
+```
+
+Restore released package:
+
+```bash
+npm run web-package:release
+```
+
+Use another released version:
+
+```bash
+npm run web-package:release -- ^0.1.4
+```
+
+Dev switch builds and packs local package first. Run it again after changing browser package source. Both commands update `frontend/package.json`, `frontend/package-lock.json`, and installed dependency.
+
+Released package comes from GitHub Packages. New uncached versions require valid `GITHUB_TOKEN` in `frontend/.npmrc` environment. Cached releases can restore offline automatically.
 
 Browser app:
 

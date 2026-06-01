@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 
 import { MetricCard } from "@/components/MetricCard";
 import { LiveConnectionStatus } from "@/components/LiveConnectionStatus";
+import { PresencePanel } from "@/components/PresencePanel";
 import { apiFetch } from "@/lib/api";
-import type { OverviewStats } from "@/types";
+import type { OverviewStats, PresenceSnapshot } from "@/types";
 
 type ConnectionState = "connecting" | "live" | "reconnecting";
 
@@ -26,7 +27,7 @@ function overviewWsUrl(projectId: string) {
     return `${getWsBaseUrl()}/dashboard/overview/ws?project_id=${encodeURIComponent(projectId)}`;
 }
 
-export function ProjectOverviewLive({ projectId, initialStats }: { projectId: string; initialStats: OverviewStats }) {
+export function ProjectOverviewLive({ projectId, initialStats, initialPresence }: { projectId: string; initialStats: OverviewStats; initialPresence: PresenceSnapshot }) {
     const [stats, setStats] = useState(initialStats);
     const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
 
@@ -121,6 +122,8 @@ export function ProjectOverviewLive({ projectId, initialStats }: { projectId: st
         <>
             <LiveConnectionStatus state={connectionState} label="Websocket" refreshLabel="Auto-refresh every 2s" />
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricCard label="Online Users" value={stats.online_users} />
+                <MetricCard label="Active Sessions" value={stats.active_sessions} />
                 <MetricCard label="Events" value={stats.events} />
                 <MetricCard label="Errors" value={stats.errors} />
                 <MetricCard label="API Requests" value={stats.requests} />
@@ -130,6 +133,7 @@ export function ProjectOverviewLive({ projectId, initialStats }: { projectId: st
                 <MetricCard label="Monitor Down" value={stats.monitor_down} />
                 <MetricCard label="Feed" value={connectionState} />
             </div>
+            <PresencePanel projectId={projectId} initialPresence={initialPresence} />
         </>
     );
 }

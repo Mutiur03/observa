@@ -3,9 +3,10 @@ type AutoTrackOptions = {
   errors?: boolean;
   fetch?: boolean;
   sessions?: boolean;
+  presence?: boolean;
 };
 
-export { Observa } from "./react";
+export { Observa } from "./react.js";
 
 export type InitOptions = {
   apiKey: string;
@@ -30,6 +31,7 @@ let anonymousId: string | null = null;
 let sessionId: string | null = null;
 let installed = false;
 let nativeFetch: typeof fetch | null = null;
+let presenceTimer: ReturnType<typeof setInterval> | undefined;
 
 export function init(input: string | InitOptions) {
   if (!input) return;
@@ -55,14 +57,17 @@ export function init(input: string | InitOptions) {
     if (config.autoTrack.errors) installGlobalErrorHandlers();
     if (config.autoTrack.fetch) installFetchTracking();
     if (config.autoTrack.sessions) installSessionTracking();
+    if (config.autoTrack.presence) installPresenceTracking();
   }
 
   if (config.autoTrack.pageViews) void capturePageView();
   if (config.autoTrack.sessions) void trackSession("start");
+  if (config.autoTrack.presence) void trackPresence();
 }
 
 export function identify(userId: string | null) {
   currentUserId = userId;
+  if (config?.autoTrack.presence) void trackPresence();
 }
 
 export function track(
@@ -143,7 +148,7 @@ async function send(path: string, body: Record<string, unknown>) {
 
 function resolveAutoTrack(input: boolean | AutoTrackOptions | undefined): Required<AutoTrackOptions> {
   if (input === false) {
-    return { pageViews: false, errors: false, fetch: false, sessions: false };
+    return { pageViews: false, errors: false, fetch: false, sessions: false, presence: false };
   }
   const partial = typeof input === "object" ? input : {};
   return {
@@ -151,6 +156,7 @@ function resolveAutoTrack(input: boolean | AutoTrackOptions | undefined): Requir
     errors: partial.errors ?? true,
     fetch: partial.fetch ?? false,
     sessions: partial.sessions ?? true,
+    presence: partial.presence ?? true,
   };
 }
 
@@ -190,7 +196,10 @@ function installGlobalErrorHandlers() {
 
 function installPageViewTracking() {
   if (typeof window === "undefined") return;
-  const emit = debounce(() => void capturePageView(), 0);
+  const emit = debounce(() => {
+    void capturePageView();
+    if (config?.autoTrack.presence) void trackPresence();
+  }, 0);
   const pushState = window.history.pushState;
   const replaceState = window.history.replaceState;
 
@@ -244,6 +253,29 @@ function installSessionTracking() {
   if (typeof window === "undefined") return;
   window.addEventListener("pagehide", () => {
     void trackSession("end");
+  });
+}
+
+function installPresenceTracking() {
+  if (typeof window === "undefined") return;
+  if (presenceTimer) clearInterval(presenceTimer);
+  presenceTimer = setInterval(() => void trackPresence(), 20_000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void trackPresence();
+  });
+}
+
+function trackPresence() {
+  if (typeof window === "undefined" || document.visibilityState === "hidden" || !sessionId || !anonymousId) {
+    return Promise.resolve();
+  }
+  return send("/presence", {
+    user_id: currentUserId,
+    anonymous_id: anonymousId,
+    session_id: sessionId,
+    path: window.location.pathname,
+    url: window.location.href,
+    title: document.title,
   });
 }
 

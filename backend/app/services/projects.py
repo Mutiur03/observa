@@ -47,7 +47,7 @@ class ProjectService:
         self.authz.require_project_role(project_id, user, "admin")
         prefix = "obspk" if payload.key_type == "public" else "obssk"
         raw_key, key_hash = generate_api_key(prefix)
-        api_key = self.keys.create(project_id, payload.name, key_hash, prefix, payload.key_type)
+        api_key = self.keys.create(project_id, payload.name, key_hash, raw_key[:16], payload.key_type)
         return ApiKeyCreated(
             id=api_key.id,
             name=api_key.name,

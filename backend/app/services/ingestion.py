@@ -22,10 +22,13 @@ class IngestionService:
         self.events = EventRepository(db)
         self.keys = ApiKeyRepository(db)
 
-    def resolve_project_id(self, api_key: str) -> str:
-        prefix = api_key.split("_", 1)[0] if "_" in api_key else ""
-        for candidate in self.keys.find_active_by_prefix(prefix):
-            if verify_password(api_key, candidate.key_hash):
+    def resolve_project_id(self, api_key: str, allowed_key_types: set[str] | None = None) -> str:
+        lookup_prefix = api_key[:16]
+        legacy_prefix = api_key.split("_", 1)[0] if "_" in api_key else ""
+        for candidate in self.keys.find_active_by_prefixes({lookup_prefix, legacy_prefix}):
+            if verify_password(api_key, candidate.key_hash) and (
+                allowed_key_types is None or candidate.key_type in allowed_key_types
+            ):
                 return candidate.project_id
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
 

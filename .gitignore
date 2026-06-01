@@ -21,6 +21,7 @@ dist/
 
 # Node / Next.js
 node_modules/
+.dev-packages/
 .next/
 out/
 coverage/

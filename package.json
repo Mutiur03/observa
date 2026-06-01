@@ -1,0 +1,8 @@
+{
+  "name": "observa",
+  "private": true,
+  "scripts": {
+    "web-package:dev": "node scripts/switch-observa-web-package.mjs dev",
+    "web-package:release": "node scripts/switch-observa-web-package.mjs release"
+  }
+}
