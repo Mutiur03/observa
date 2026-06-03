@@ -56,6 +56,10 @@ function overviewWsUrl(projectId: string, range: OverviewRange) {
     return `${getWsBaseUrl()}/dashboard/overview/ws?${overviewQuery(projectId, range)}`;
 }
 
+function debugLog(...args: unknown[]) {
+    if (process.env.NODE_ENV !== "production") console.debug(...args);
+}
+
 function formatMetric(value: number | string) {
     return typeof value === "number" ? value.toLocaleString() : value;
 }
@@ -104,7 +108,7 @@ export function ProjectOverviewLive({ projectId, initialStats, initialPresence }
 
         const startPolling = () => {
             if (pollTimer) return;
-            console.debug("overview polling start", projectId);
+            debugLog("overview polling start", projectId);
             setConnectionState("reconnecting");
             pollTimer = setInterval(async () => {
                 try {
@@ -112,7 +116,7 @@ export function ProjectOverviewLive({ projectId, initialStats, initialPresence }
                     if (!active) return;
                     setStats(fresh);
                 } catch (err) {
-                    console.debug("overview polling error", err);
+                    debugLog("overview polling error", err);
                 }
             }, 2000);
         };
@@ -130,14 +134,14 @@ export function ProjectOverviewLive({ projectId, initialStats, initialPresence }
             try {
                 socket = new WebSocket(overviewWsUrl(projectId, range));
             } catch (err) {
-                console.debug("overview ws construct error", err);
+                debugLog("overview ws construct error", err);
                 startPolling();
                 return;
             }
 
             socket.onopen = () => {
                 if (!active) return;
-                console.debug("overview ws open", projectId);
+                debugLog("overview ws open", projectId);
                 setConnectionState("live");
                 stopPolling();
             };
@@ -145,7 +149,7 @@ export function ProjectOverviewLive({ projectId, initialStats, initialPresence }
             socket.onmessage = (event) => {
                 if (!active) return;
                 try {
-                    console.debug("overview ws message", event.data);
+                    debugLog("overview ws message", event.data);
                     const message = JSON.parse(event.data as string) as { type?: string; data?: OverviewStats };
                     if (message.type === "overview" && message.data) {
                         setStats(message.data);
@@ -157,7 +161,7 @@ export function ProjectOverviewLive({ projectId, initialStats, initialPresence }
 
             socket.onclose = (event) => {
                 if (!active) return;
-                console.debug("overview ws closed", event);
+                debugLog("overview ws closed", event);
                 // fallback to polling when ws not available or auth blocked
                 startPolling();
                 // try reconnecting websocket later
@@ -168,7 +172,7 @@ export function ProjectOverviewLive({ projectId, initialStats, initialPresence }
             };
 
             socket.onerror = (ev) => {
-                console.debug("overview ws error", ev);
+                debugLog("overview ws error", ev);
                 socket?.close();
             };
         };

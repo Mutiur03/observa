@@ -28,6 +28,10 @@ function getWsBaseUrl() {
   return "ws://localhost:8000";
 }
 
+function debugLog(...args: unknown[]) {
+  if (process.env.NODE_ENV !== "production") console.debug(...args);
+}
+
 function matches(row: EventRow, filters: EventFilters, search: string) {
   if (filters.event_type && row.event_type !== filters.event_type) return false;
   if (filters.session_id && row.session_id !== filters.session_id) return false;
@@ -96,7 +100,7 @@ export function EventTablePage({
         const data = await apiFetch<{ items: EventRow[] }>(`/dashboard/events?${queryString(projectId, stableFilters, search)}`);
         if (active) setRows(data.items);
       } catch (err) {
-        console.debug("events refresh error", err);
+        debugLog("events refresh error", err);
       }
     };
     const startPolling = () => {
@@ -137,7 +141,7 @@ export function EventTablePage({
             setRows((current) => current.filter((row) => !ids.has(row.id)));
           }
         } catch (err) {
-          console.debug("events ws message parse error", err);
+          debugLog("events ws message parse error", err);
         }
       };
       socket.onclose = () => {
@@ -184,7 +188,7 @@ export function EventTablePage({
           <h1 className="mt-1 text-2xl font-semibold">{title}</h1>
           <p className="mt-1 text-sm text-muted">{description}</p>
         </div>
-        <button onClick={clearEvents} className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-sm font-medium text-danger">
+        <button onClick={clearEvents} className="w-full rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-sm font-medium text-danger sm:w-auto">
           Clear filtered events
         </button>
       </div>
@@ -213,7 +217,7 @@ export function EventTablePage({
               });
               if (value) params.set("event_type", value);
               return (
-                <Link key={value} href={`${basePath}${params.size ? `?${params}` : ""}`} className={`rounded-full border border-border px-3 py-1.5 text-sm ${stableFilters.event_type === value ? "bg-brand text-white" : "bg-surface hover:bg-surface-muted"}`}>
+                <Link key={value} href={`${basePath}${params.size ? `?${params}` : ""}`} className={`rounded-md border border-border px-3 py-1.5 text-sm ${stableFilters.event_type === value ? "bg-brand text-white" : "bg-surface hover:bg-surface-muted"}`}>
                   {label}
                 </Link>
               );
@@ -247,18 +251,18 @@ export function EventTablePage({
           {
             key: "actions",
             label: "",
-            render: (row) => <div className="flex gap-2"><button onClick={() => setSelected(row)} className="rounded-md border border-border px-2 py-1 text-sm">View</button><button onClick={() => deleteEvent(row.id)} className="rounded-md border border-danger/30 px-2 py-1 text-sm text-danger">Delete</button></div>,
+            render: (row) => <div className="flex flex-wrap gap-2"><button onClick={() => setSelected(row)} className="rounded-md border border-border px-2 py-1 text-sm">View</button><button onClick={() => deleteEvent(row.id)} className="rounded-md border border-danger/30 px-2 py-1 text-sm text-danger">Delete</button></div>,
           },
         ]}
       />
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-6" role="dialog" aria-modal="true" aria-label="Event details dialog" onKeyDown={(event) => { if (event.key === "Escape") setSelected(undefined); }}>
-          <div className="max-h-[80vh] w-full max-w-3xl overflow-auto rounded-2xl border border-border bg-surface p-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Event details dialog" onKeyDown={(event) => { if (event.key === "Escape") setSelected(undefined); }}>
+          <div className="max-h-[86vh] w-full max-w-3xl overflow-auto rounded-lg border border-border bg-surface p-4 shadow-2xl">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-semibold">Event details</h2>
               <button ref={closeButtonRef} onClick={() => setSelected(undefined)} className="rounded-full border border-border bg-surface-muted px-3 py-1 text-sm">Close</button>
             </div>
-            <pre className="whitespace-pre-wrap text-sm">{JSON.stringify(selected, null, 2)}</pre>
+            <pre className="whitespace-pre-wrap break-words text-sm">{JSON.stringify(selected, null, 2)}</pre>
           </div>
         </div>
       )}

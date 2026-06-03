@@ -21,6 +21,10 @@ function getWsBaseUrl() {
   return "ws://localhost:8000";
 }
 
+function debugLog(...args: unknown[]) {
+  if (process.env.NODE_ENV !== "production") console.debug(...args);
+}
+
 export function SessionsTableLive({ projectId, initialRows }: { projectId: string; initialRows: SessionSummaryRow[] }) {
   const [rows, setRows] = useState(initialRows);
   const [connectionState, setConnectionState] = useState<"connecting" | "live" | "reconnecting">("connecting");
@@ -34,7 +38,7 @@ export function SessionsTableLive({ projectId, initialRows }: { projectId: strin
         const data = await apiFetch<{ items: SessionSummaryRow[] }>(`/dashboard/sessions?project_id=${encodeURIComponent(projectId)}`);
         if (active) setRows(data.items);
       } catch (err) {
-        console.debug("sessions refresh error", err);
+        debugLog("sessions refresh error", err);
       }
     };
     const addEvent = (event: LiveEvent) => {
@@ -86,7 +90,7 @@ export function SessionsTableLive({ projectId, initialRows }: { projectId: strin
             refresh();
           }
         } catch (err) {
-          console.debug("sessions ws message parse error", err);
+          debugLog("sessions ws message parse error", err);
         }
       };
       socket.onclose = () => {

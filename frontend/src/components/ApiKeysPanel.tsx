@@ -46,19 +46,19 @@ export function ApiKeysPanel({ projectId, initialKeys }: { projectId: string; in
     <>
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-semibold">API Keys</h1>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <input className="rounded-md border border-border px-3 py-2 text-sm" value={keyName} onChange={(event) => setKeyName(event.target.value)} />
+        <div className="grid gap-2 sm:grid-cols-[minmax(180px,1fr)_auto_auto]">
+          <input className="min-w-0 rounded-md border border-border px-3 py-2 text-sm" value={keyName} onChange={(event) => setKeyName(event.target.value)} />
           <button onClick={() => createKey("public")} className="rounded-md border border-border bg-surface px-3 py-2 text-sm hover:bg-surface-muted">Public key</button>
           <button onClick={() => createKey("secret")} className="rounded-md bg-brand px-3 py-2 text-sm text-white hover:bg-brand-strong">Secret key</button>
         </div>
       </div>
-      {createdKey && <div className="mb-4 rounded-md border border-info/20 bg-info-soft p-4 text-sm text-info">New key: <code>{createdKey}</code></div>}
+      {createdKey && <div className="mb-4 rounded-md border border-info/20 bg-info-soft p-4 text-sm text-info">New key: <code className="break-all">{createdKey}</code></div>}
       {error && <div className="mb-4 rounded-md border border-danger/20 bg-danger-soft p-4 text-sm text-danger">{error}</div>}
       <div className="mb-4 rounded-xl border border-border bg-surface p-4 shadow-sm">
         <h2 className="font-semibold">Website presence tracking</h2>
         <p className="mt-1 text-sm text-muted">Add this one tag to your website. No SDK needed. It sends a heartbeat every 20 seconds and visitors expire after 60 seconds.</p>
         <pre className="mt-3 overflow-x-auto rounded-md bg-ink p-3 text-xs text-white">{presenceSnippet}</pre>
-        <p className="mt-3 text-sm text-muted">After login, identify user with <code className="rounded bg-surface-muted px-1 py-0.5">window.ObservaPresence.identify("user_123")</code>.</p>
+        <p className="mt-3 text-sm text-muted">After login, identify user with <code className="break-all rounded bg-surface-muted px-1 py-0.5">window.ObservaPresence.identify("user_123")</code>.</p>
       </div>
       <DataTable rows={keys} empty="No API keys yet." columns={[
         { key: "name", label: "Name", render: (row) => row.name },

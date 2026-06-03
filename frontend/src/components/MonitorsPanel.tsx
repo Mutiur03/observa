@@ -64,7 +64,7 @@ export function MonitorsPanel({ projectId, initialRows }: { projectId: string; i
         { key: "url", label: "URL", render: (row) => row.url },
         { key: "status", label: "Expected", render: (row) => row.expected_status },
         { key: "active", label: "Active", render: (row) => row.is_active ? "Yes" : "No" },
-        { key: "action", label: "", render: (row) => <div className="flex gap-2"><button className="rounded-md border border-border px-3 py-1 text-sm" onClick={() => checkNow(row.id)}>Check</button><button className="rounded-md border border-border px-3 py-1 text-sm" onClick={() => deleteMonitor(row.id)}>Delete</button></div> },
+        { key: "action", label: "", render: (row) => <div className="flex flex-wrap gap-2"><button className="rounded-md border border-border px-3 py-1 text-sm" onClick={() => checkNow(row.id)}>Check</button><button className="rounded-md border border-border px-3 py-1 text-sm" onClick={() => deleteMonitor(row.id)}>Delete</button></div> },
       ]} />
     </>
   );
