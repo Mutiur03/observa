@@ -5,8 +5,11 @@ from pydantic import BaseModel
 
 
 class OverviewStats(BaseModel):
+    time_range: str
     online_users: int
     active_sessions: int
+    active_users: int
+    new_users: int
     events: int
     errors: int
     requests: int

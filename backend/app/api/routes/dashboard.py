@@ -46,13 +46,18 @@ def _is_realtime_payload(payload) -> bool:
 
 
 @router.get("/overview")
-def overview(project_id: str = Query(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def overview(
+    project_id: str = Query(...),
+    range_: str = Query("24h", alias="range"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     AuthorizationService(db).require_project_role(project_id, user, "viewer")
-    return DashboardService(db).overview(project_id)
+    return DashboardService(db).overview(project_id, range_)
 
 
 @router.websocket("/overview/ws")
-async def overview_stream(websocket: WebSocket, project_id: str = Query(...)):
+async def overview_stream(websocket: WebSocket, project_id: str = Query(...), range_: str = Query("24h", alias="range")):
     db = SessionLocal()
     try:
         if not await _require_allowed_origin(websocket):
@@ -83,7 +88,7 @@ async def overview_stream(websocket: WebSocket, project_id: str = Query(...)):
         service = DashboardService(db)
         while True:
             try:
-                data = service.overview(project_id).model_dump()
+                data = service.overview(project_id, range_).model_dump()
                 await websocket.send_json({"type": "overview", "data": data})
             except WebSocketDisconnect:
                 break
@@ -324,6 +329,11 @@ def user_timeline(user_id: str, project_id: str, user: User = Depends(get_curren
 
 
 @router.get("/projects/{project_id}/stats")
-def project_stats(project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def project_stats(
+    project_id: str,
+    range_: str = Query("24h", alias="range"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     AuthorizationService(db).require_project_role(project_id, user, "viewer")
-    return DashboardService(db).overview(project_id)
+    return DashboardService(db).overview(project_id, range_)

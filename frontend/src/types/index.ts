@@ -14,8 +14,11 @@ export type Organization = {
 };
 
 export type OverviewStats = {
+  time_range: string;
   online_users: number;
   active_sessions: number;
+  active_users: number;
+  new_users: number;
   events: number;
   errors: number;
   requests: number;

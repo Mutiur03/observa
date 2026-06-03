@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Select, delete, func, or_, select
+from sqlalchemy import Select, case, delete, func, literal, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.events import ApiRequestEvent, ErrorEvent, Event, JobEvent, SessionEvent, WebhookEvent
@@ -124,6 +124,30 @@ class EventRepository:
     def count(self, model: type, project_id: str) -> int:
         return self.db.scalar(select(func.count()).select_from(model).where(model.project_id == project_id)) or 0
 
+    def count_active_users(self, project_id: str, start: datetime | None, end: datetime | None) -> int:
+        identity = self._identity_expression()
+        query = select(func.count(func.distinct(identity))).where(
+            Event.project_id == project_id,
+            or_(Event.user_id.isnot(None), Event.anonymous_id.isnot(None)),
+        )
+        query = self._date_filter(query, Event.timestamp, start, end)
+        return self.db.scalar(query) or 0
+
+    def count_new_users(self, project_id: str, start: datetime | None, end: datetime | None) -> int:
+        identity = self._identity_expression()
+        first_seen = (
+            select(identity.label("identity"), func.min(Event.timestamp).label("first_seen"))
+            .where(Event.project_id == project_id, or_(Event.user_id.isnot(None), Event.anonymous_id.isnot(None)))
+            .group_by(identity)
+            .subquery()
+        )
+        query = select(func.count()).select_from(first_seen)
+        if start:
+            query = query.where(first_seen.c.first_seen >= start)
+        if end:
+            query = query.where(first_seen.c.first_seen <= end)
+        return self.db.scalar(query) or 0
+
     def timeline_for_user(self, project_id: str, user_id: str, limit: int = 100) -> list[Event]:
         query = (
             select(Event)
@@ -166,6 +190,12 @@ class EventRepository:
         if end:
             query = query.where(column <= end)
         return query
+
+    def _identity_expression(self):
+        return case(
+            (Event.user_id.isnot(None), literal("user:") + Event.user_id),
+            else_=literal("anon:") + Event.anonymous_id,
+        )
 
 
 EVENT_MODELS = {

@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy.orm import Session
 
 from app.models.events import ApiRequestEvent, ErrorEvent, Event, JobEvent, SessionEvent, WebhookEvent
@@ -12,11 +14,15 @@ class DashboardService:
         self.db = db
         self.events = EventRepository(db)
 
-    def overview(self, project_id: str) -> OverviewStats:
+    def overview(self, project_id: str, time_range: str = "24h") -> OverviewStats:
         presence = PresenceService().snapshot(project_id)
+        normalized_range, start, end = self._overview_window(time_range)
         return OverviewStats(
+            time_range=normalized_range,
             online_users=presence.online_users,
             active_sessions=presence.active_sessions,
+            active_users=self.events.count_active_users(project_id, start, end),
+            new_users=self.events.count_new_users(project_id, start, end),
             events=self.events.count(Event, project_id),
             errors=self.events.count(ErrorEvent, project_id),
             requests=self.events.count(ApiRequestEvent, project_id),
@@ -30,6 +36,19 @@ class DashboardService:
                 .count()
             ),
         )
+
+    def _overview_window(self, time_range: str) -> tuple[str, datetime | None, datetime | None]:
+        windows = {
+            "24h": timedelta(hours=24),
+            "7d": timedelta(days=7),
+            "30d": timedelta(days=30),
+            "90d": timedelta(days=90),
+        }
+        normalized = time_range if time_range in {*windows, "all"} else "24h"
+        if normalized == "all":
+            return normalized, None, None
+        end = datetime.now(timezone.utc)
+        return normalized, end - windows[normalized], end
 
     def events_page(
         self,
