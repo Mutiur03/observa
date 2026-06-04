@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import { BarChart3, Clock3, Gauge, GitBranch, KeyRound, LayoutDashboard, Lightbulb, ListTree, Menu, Radio, Settings, Users, Wifi, X, LogOut } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import type { Project } from "@/types";
@@ -41,22 +40,9 @@ export function AppShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const projectMenuRef = useRef<HTMLDivElement | null>(null);
-  const projectsQuery = useQuery({
-    queryKey: ["projects"],
-    queryFn: () => apiFetch<Project[]>("/projects"),
-    enabled: Boolean(projectId),
-    initialData: initialProjects.length ? initialProjects : undefined,
-    staleTime: 60_000,
-  });
-  const projects = projectsQuery.data ?? initialProjects;
+  const projects = initialProjects;
   const projectFromList = projects.find((project) => project.id === projectId);
-  const projectQuery = useQuery({
-    queryKey: ["project", projectId],
-    queryFn: () => apiFetch<Project>(`/projects/${projectId}`),
-    enabled: Boolean(projectId && !projectName && !projectFromList),
-    staleTime: 60_000,
-  });
-  const displayProjectName = projectName ?? projectFromList?.name ?? projectQuery.data?.name;
+  const displayProjectName = projectName ?? projectFromList?.name;
 
   const activeLabel = useMemo(() => {
     if (!projectId) return "";

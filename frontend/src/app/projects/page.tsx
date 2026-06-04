@@ -3,7 +3,7 @@ import { serverApiFetch } from "@/lib/server-api";
 import type { Project } from "@/types";
 
 export default async function ProjectsPage() {
-  const projects = await serverApiFetch<Project[]>("/projects");
+  const projects = await serverApiFetch<Project[]>("/projects", { next: { revalidate: 60 } });
 
   return (
     <main className="min-h-screen p-6">
