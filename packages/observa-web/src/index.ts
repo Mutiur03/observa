@@ -178,7 +178,7 @@ function resolveAutoTrack(input: boolean | AutoTrackOptions | undefined): Requir
     fetch: partial.fetch ?? false,
     sessions: partial.sessions ?? true,
     presence: partial.presence ?? true,
-    webVitals: partial.webVitals ?? true,
+    webVitals: partial.webVitals ?? false,
   };
 }
 
@@ -398,7 +398,6 @@ function installWebVitalsTracking() {
   if (typeof window === "undefined" || typeof PerformanceObserver === "undefined") return;
   observeLargestContentfulPaint();
   observeCumulativeLayoutShift();
-  observeInteractionToNextPaint();
   reportNavigationTiming();
 }
 
@@ -448,27 +447,6 @@ function observeCumulativeLayoutShift() {
       reported = true;
       observer.disconnect();
       reportWebVital("CLS", cls, rateCls(cls));
-    });
-  } catch {
-    // Some browsers do not support this metric.
-  }
-}
-
-function observeInteractionToNextPaint() {
-  let inp = 0;
-  let reported = false;
-  try {
-    const observer = new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        inp = Math.max(inp, entry.duration);
-      }
-    });
-    observer.observe({ type: "event", buffered: true, durationThreshold: 40 } as PerformanceObserverInit);
-    reportWhenPageHides(() => {
-      if (reported || !inp) return;
-      reported = true;
-      observer.disconnect();
-      reportWebVital("INP", inp, rateInp(inp));
     });
   } catch {
     // Some browsers do not support this metric.
@@ -594,12 +572,6 @@ function rateLcp(value: number) {
 function rateCls(value: number) {
   if (value <= 0.1) return "good";
   if (value <= 0.25) return "needs-improvement";
-  return "poor";
-}
-
-function rateInp(value: number) {
-  if (value <= 200) return "good";
-  if (value <= 500) return "needs-improvement";
   return "poor";
 }
 
