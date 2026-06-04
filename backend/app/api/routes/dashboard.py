@@ -187,7 +187,12 @@ async def events_stream(websocket: WebSocket, project_id: str = Query(...)):
         await websocket.accept()
 
         settings = get_settings()
-        redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+        redis = aioredis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=settings.redis_connect_timeout_seconds,
+            socket_timeout=settings.redis_socket_timeout_seconds,
+        )
         pubsub = redis.pubsub()
         channel = f"project:{project_id}:events"
         await pubsub.subscribe(channel)
@@ -276,7 +281,13 @@ async def presence_stream(websocket: WebSocket, project_id: str = Query(...)):
         AuthorizationService(db).require_project_role(project_id, user, "viewer")
         await websocket.accept()
 
-        redis = aioredis.from_url(get_settings().redis_url, decode_responses=True)
+        settings = get_settings()
+        redis = aioredis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=settings.redis_connect_timeout_seconds,
+            socket_timeout=settings.redis_socket_timeout_seconds,
+        )
         pubsub = redis.pubsub()
         await pubsub.subscribe(f"project:{project_id}:presence")
         service = PresenceService()

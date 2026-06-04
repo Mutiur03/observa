@@ -33,6 +33,7 @@ let sessionId: string | null = null;
 let installed = false;
 let nativeFetch: typeof fetch | null = null;
 let presenceTimer: ReturnType<typeof setInterval> | undefined;
+let lastTrackedPageUrl: string | null = null;
 
 export function init(input: string | InitOptions) {
   if (!input) return;
@@ -90,6 +91,9 @@ export function track(
 
 export function capturePageView(properties: Record<string, unknown> = {}) {
   if (typeof window === "undefined") return Promise.resolve();
+  const pageUrl = window.location.href;
+  if (pageUrl === lastTrackedPageUrl) return Promise.resolve();
+  lastTrackedPageUrl = pageUrl;
   const currentUrl = new URL(window.location.href);
   const referrerUrl = parseUrl(document.referrer);
   const bot = detectBot();
@@ -218,6 +222,14 @@ function installPageViewTracking() {
     void capturePageView();
     if (config?.autoTrack.presence) void trackPresence();
   }, 0);
+  const navigation = (window as Window & { navigation?: EventTarget }).navigation;
+
+  if (navigation) {
+    navigation.addEventListener("currententrychange", emit);
+    window.addEventListener("hashchange", emit);
+    return;
+  }
+
   const pushState = window.history.pushState;
   const replaceState = window.history.replaceState;
 
@@ -234,6 +246,7 @@ function installPageViewTracking() {
   };
 
   window.addEventListener("popstate", emit);
+  window.addEventListener("hashchange", emit);
 }
 
 function installFetchTracking() {

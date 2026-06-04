@@ -14,7 +14,13 @@ PRESENCE_SESSION_LIMIT = 10_000
 
 class PresenceService:
     def __init__(self):
-        self.redis = Redis.from_url(get_settings().redis_url, decode_responses=True)
+        settings = get_settings()
+        self.redis = Redis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=settings.redis_connect_timeout_seconds,
+            socket_timeout=settings.redis_socket_timeout_seconds,
+        )
 
     def heartbeat(self, project_id: str, payload: PresenceHeartbeatIn) -> dict[str, bool]:
         try:

@@ -15,7 +15,12 @@ class Settings(BaseSettings):
     environment: str = "development"
     api_v1_prefix: str = "/v1"
     database_url: str = "postgresql+psycopg://observa:observa@127.0.0.1:5435/observa"
+    database_pool_size: int = 20
+    database_max_overflow: int = 20
+    database_pool_timeout_seconds: int = 5
     redis_url: str = "redis://127.0.0.1:6380/0"
+    redis_connect_timeout_seconds: float = 0.5
+    redis_socket_timeout_seconds: float = 1.0
     jwt_secret_key: str = Field(default="change-me-in-production")
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24

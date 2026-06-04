@@ -69,11 +69,14 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
-      <div
-        className={`fixed inset-0 z-40 bg-black/25 transition-opacity md:hidden ${sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-        onClick={() => setSidebarOpen(false)}
-        aria-hidden="true"
-      />
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 cursor-default bg-black/25 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close sidebar"
+        />
+      )}
       <aside className={`fixed inset-y-0 left-0 z-50 w-72 border-r border-border bg-surface/95 p-4 shadow-[0_20px_70px_rgba(17,17,17,0.08)] backdrop-blur transition-transform md:w-64 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"} flex flex-col h-full`}>
         <div className="mb-6 flex items-center justify-between gap-3">
           <Link href="/projects" className="flex items-center gap-2 text-lg font-semibold">
@@ -151,7 +154,10 @@ export function AppShell({
                 <Link
                   key={label}
                   href={target}
-                  onClick={() => setSidebarOpen(false)}
+                  onClick={() => {
+                    setSidebarOpen(false);
+                    setProjectMenuOpen(false);
+                  }}
                   className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${isActive ? "bg-brand text-white shadow-sm" : "text-ink hover:bg-surface-muted"
                     }`}
                 >

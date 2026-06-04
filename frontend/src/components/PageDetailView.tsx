@@ -85,7 +85,7 @@ function LineChart({ points }: { points: PageDetailSummary["series"] }) {
         <polyline points={line} fill="none" stroke="currentColor" strokeWidth="3" className="text-brand" strokeLinecap="round" strokeLinejoin="round" />
         {coords.map((point) => (
           <circle key={`${point.timestamp}-${point.x}`} cx={point.x} cy={point.y} r="4" className="fill-brand">
-            <title>{formatMetric(point.page_views)} views / {formatMetric(point.visitors)} visitors</title>
+            <title>{`${formatMetric(point.page_views)} views / ${formatMetric(point.visitors)} visitors`}</title>
           </circle>
         ))}
       </svg>

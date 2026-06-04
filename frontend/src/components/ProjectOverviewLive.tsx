@@ -246,7 +246,7 @@ function LineChart({
                 <polyline points={line} fill="none" stroke="currentColor" strokeWidth="3" className="text-brand" strokeLinecap="round" strokeLinejoin="round" />
                 {coords.map((point) => (
                     <circle key={`${point.label}-${point.x}`} cx={point.x} cy={point.y} r="4" className="fill-brand">
-                        <title>{formatMetric(point.value)} {label}{secondaryLabel && point.secondary !== undefined ? ` / ${formatMetric(point.secondary)} ${secondaryLabel}` : ""}</title>
+                        <title>{`${formatMetric(point.value)} ${label}${secondaryLabel && point.secondary !== undefined ? ` / ${formatMetric(point.secondary)} ${secondaryLabel}` : ""}`}</title>
                     </circle>
                 ))}
             </svg>

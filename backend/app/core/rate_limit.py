@@ -12,7 +12,12 @@ class RateLimiter:
     def __init__(self) -> None:
         settings = get_settings()
         self.limit = settings.ingestion_rate_limit_per_minute
-        self.redis = Redis.from_url(settings.redis_url, decode_responses=True)
+        self.redis = Redis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=settings.redis_connect_timeout_seconds,
+            socket_timeout=settings.redis_socket_timeout_seconds,
+        )
 
     def check(self, key: str, limit: int | None = None) -> None:
         now = int(time.time())

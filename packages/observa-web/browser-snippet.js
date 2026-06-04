@@ -5,6 +5,7 @@
   var sessionId = getOrCreate("sessionStorage", "observa_session_id");
   var nativeFetch = window.fetch && window.fetch.bind(window);
   var installed = false;
+  var lastTrackedPageUrl = null;
 
   function init(input) {
     var options = typeof input === "string" ? { apiKey: input } : input;
@@ -38,6 +39,8 @@
   }
 
   function pageView() {
+    if (location.href === lastTrackedPageUrl) return;
+    lastTrackedPageUrl = location.href;
     send("/events", {
       event_type: "page_view",
       event_name: location.pathname,
@@ -73,6 +76,12 @@
   }
 
   function installPageViews() {
+    if (window.navigation) {
+      window.navigation.addEventListener("currententrychange", pageView);
+      window.addEventListener("hashchange", pageView);
+      return;
+    }
+
     var pushState = history.pushState;
     var replaceState = history.replaceState;
     history.pushState = function () {
@@ -86,6 +95,7 @@
       return result;
     };
     window.addEventListener("popstate", pageView);
+    window.addEventListener("hashchange", pageView);
   }
 
   function installErrors() {
