@@ -26,6 +26,26 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 logger = logging.getLogger(__name__)
 
 
+def _authorize_websocket_project(websocket: WebSocket, project_id: str) -> str | None:
+    token = websocket.cookies.get(get_settings().auth_cookie_name)
+    if not token:
+        return None
+
+    user_id = decode_access_token(token)
+    if not user_id:
+        return None
+
+    db = SessionLocal()
+    try:
+        user = UserRepository(db).get(user_id)
+        if not user or not user.is_active:
+            return None
+        AuthorizationService(db).require_project_role(project_id, user, "viewer")
+        return user_id
+    finally:
+        db.close()
+
+
 async def _require_allowed_origin(websocket: WebSocket) -> bool:
     if is_allowed_browser_origin(websocket.headers.get("origin")):
         return True
@@ -115,37 +135,23 @@ def funnel(
 
 @router.websocket("/overview/ws")
 async def overview_stream(websocket: WebSocket, project_id: str = Query(...), range_: str = Query("24h", alias="range")):
-    db = SessionLocal()
     try:
         if not await _require_allowed_origin(websocket):
             return
         logger.info("websocket connection attempt for project_id=%s", project_id)
-        token = websocket.cookies.get(get_settings().auth_cookie_name)
-        if not token:
-            logger.warning("ws no auth cookie for project %s", project_id)
-            await websocket.close(code=1008)
-            return
-
-        user_id = decode_access_token(token)
-        logger.debug("ws decoded user id: %s", user_id)
+        user_id = _authorize_websocket_project(websocket, project_id)
         if not user_id:
-            logger.warning("ws token invalid for project %s", project_id)
+            logger.warning("ws auth failed for project %s", project_id)
             await websocket.close(code=1008)
             return
 
-        user = UserRepository(db).get(user_id)
-        if not user or not user.is_active:
-            await websocket.close(code=1008)
-            return
-
-        AuthorizationService(db).require_project_role(project_id, user, "viewer")
         await websocket.accept()
         logger.info("ws accepted for user=%s project=%s", user_id, project_id)
 
-        service = DashboardService(db)
         while True:
             try:
-                data = service.overview(project_id, range_).model_dump()
+                with SessionLocal() as db:
+                    data = DashboardService(db).overview(project_id, range_).model_dump()
                 await websocket.send_json({"type": "overview", "data": data})
             except WebSocketDisconnect:
                 break
@@ -156,34 +162,20 @@ async def overview_stream(websocket: WebSocket, project_id: str = Query(...), ra
             await asyncio.sleep(2)
     except WebSocketDisconnect:
         pass
-    finally:
-        db.close()
 
 
 @router.websocket("/events/ws")
 async def events_stream(websocket: WebSocket, project_id: str = Query(...)):
-    db = SessionLocal()
     try:
         if not await _require_allowed_origin(websocket):
             return
         logger.info("events websocket connection attempt for project_id=%s", project_id)
-        token = websocket.cookies.get(get_settings().auth_cookie_name)
-        if not token:
-            logger.warning("events ws no auth token for project %s", project_id)
-            await websocket.close(code=1008)
-            return
-
-        user_id = decode_access_token(token)
+        user_id = _authorize_websocket_project(websocket, project_id)
         if not user_id:
+            logger.warning("events ws auth failed for project %s", project_id)
             await websocket.close(code=1008)
             return
 
-        user = UserRepository(db).get(user_id)
-        if not user or not user.is_active:
-            await websocket.close(code=1008)
-            return
-
-        AuthorizationService(db).require_project_role(project_id, user, "viewer")
         await websocket.accept()
 
         settings = get_settings()
@@ -195,7 +187,14 @@ async def events_stream(websocket: WebSocket, project_id: str = Query(...)):
         )
         pubsub = redis.pubsub()
         channel = f"project:{project_id}:events"
-        await pubsub.subscribe(channel)
+        try:
+            await pubsub.subscribe(channel)
+        except RedisTimeoutError:
+            logger.warning("events ws redis subscribe timeout project=%s", project_id)
+            await websocket.close(code=1011)
+            await pubsub.close()
+            await redis.close()
+            return
         logger.info("events ws subscribed user=%s project=%s", user_id, project_id)
 
         disconnect_task = asyncio.create_task(websocket.receive())
@@ -253,8 +252,6 @@ async def events_stream(websocket: WebSocket, project_id: str = Query(...)):
             await redis.close()
     except WebSocketDisconnect:
         pass
-    finally:
-        db.close()
 
 
 @router.get("/presence")
@@ -265,20 +262,16 @@ def presence(project_id: str = Query(...), user: User = Depends(get_current_user
 
 @router.websocket("/presence/ws")
 async def presence_stream(websocket: WebSocket, project_id: str = Query(...)):
-    db = SessionLocal()
     redis = None
     pubsub = None
     try:
         if not await _require_allowed_origin(websocket):
             return
-        token = websocket.cookies.get(get_settings().auth_cookie_name)
-        user_id = decode_access_token(token) if token else None
-        user = UserRepository(db).get(user_id) if user_id else None
-        if not user or not user.is_active:
+        user_id = _authorize_websocket_project(websocket, project_id)
+        if not user_id:
             await websocket.close(code=1008)
             return
 
-        AuthorizationService(db).require_project_role(project_id, user, "viewer")
         await websocket.accept()
 
         settings = get_settings()
@@ -289,7 +282,14 @@ async def presence_stream(websocket: WebSocket, project_id: str = Query(...)):
             socket_timeout=settings.redis_socket_timeout_seconds,
         )
         pubsub = redis.pubsub()
-        await pubsub.subscribe(f"project:{project_id}:presence")
+        try:
+            await pubsub.subscribe(f"project:{project_id}:presence")
+        except RedisTimeoutError:
+            logger.warning("presence ws redis subscribe timeout project=%s", project_id)
+            await websocket.close(code=1011)
+            await pubsub.close()
+            await redis.close()
+            return
         service = PresenceService()
         while True:
             await websocket.send_json({"type": "presence", "data": service.snapshot(project_id).model_dump(mode="json")})
@@ -301,7 +301,6 @@ async def presence_stream(websocket: WebSocket, project_id: str = Query(...)):
             await pubsub.close()
         if redis:
             await redis.close()
-        db.close()
 
 
 @router.get("/events")

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     database_pool_timeout_seconds: int = 5
     redis_url: str = "redis://127.0.0.1:6380/0"
     redis_connect_timeout_seconds: float = 0.5
-    redis_socket_timeout_seconds: float = 1.0
+    redis_socket_timeout_seconds: float = 5.0
     jwt_secret_key: str = Field(default="change-me-in-production")
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24
