@@ -1,6 +1,7 @@
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { Observa } from "@/components/Observa";
+import { QueryProvider } from "@/components/QueryProvider";
 import { Analytics } from "@vercel/analytics/next"
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -17,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-canvas text-ink antialiased">
         <Analytics />
         {observaApiKey ? <Observa apiKey={observaApiKey} /> : null}
-        {children}
+        <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
   );

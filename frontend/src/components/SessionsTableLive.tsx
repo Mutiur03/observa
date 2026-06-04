@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DataTable } from "@/components/DataTable";
 import { LiveConnectionStatus } from "@/components/LiveConnectionStatus";
+import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatMetric } from "@/lib/format";
 import type { SessionSummaryRow } from "@/types";
 
@@ -14,6 +15,18 @@ type LiveEvent = {
   timestamp?: string;
 };
 
+type RawSessionRow = {
+  session_id?: string;
+  user_id?: string | null;
+  anonymous_id?: string | null;
+  event_count?: number;
+  first_seen?: string;
+  last_seen?: string;
+  timestamp?: string;
+};
+
+type PageData<T> = { items: T[]; total: number; page: number; page_size: number };
+
 function getWsBaseUrl() {
   const apiBase = (process.env.NEXT_PUBLIC_API_URL as string) || "";
   if (apiBase.startsWith("http")) return apiBase.replace(/^http/i, "ws");
@@ -23,6 +36,46 @@ function getWsBaseUrl() {
 
 function debugLog(...args: unknown[]) {
   if (process.env.NODE_ENV !== "production") console.debug(...args);
+}
+
+function normalizeSessions(rows: RawSessionRow[]): SessionSummaryRow[] {
+  const grouped = new Map<string, SessionSummaryRow>();
+
+  for (const row of rows) {
+    if (!row.session_id) continue;
+
+    const timestamp = row.timestamp ?? row.first_seen ?? row.last_seen ?? new Date().toISOString();
+    const existing = grouped.get(row.session_id);
+
+    if (!existing) {
+      grouped.set(row.session_id, {
+        session_id: row.session_id,
+        user_id: row.user_id ?? null,
+        anonymous_id: row.anonymous_id ?? null,
+        event_count: row.event_count ?? 1,
+        first_seen: row.first_seen ?? timestamp,
+        last_seen: row.last_seen ?? timestamp,
+      });
+      continue;
+    }
+
+    const firstSeen = new Date(existing.first_seen).getTime();
+    const lastSeen = new Date(existing.last_seen).getTime();
+    const nextSeen = new Date(timestamp).getTime();
+
+    grouped.set(row.session_id, {
+      ...existing,
+      user_id: existing.user_id ?? row.user_id ?? null,
+      anonymous_id: existing.anonymous_id ?? row.anonymous_id ?? null,
+      event_count: existing.event_count + (row.event_count ?? 1),
+      first_seen: Number.isNaN(firstSeen) || nextSeen < firstSeen ? timestamp : existing.first_seen,
+      last_seen: Number.isNaN(lastSeen) || nextSeen > lastSeen ? timestamp : existing.last_seen,
+    });
+  }
+
+  return Array.from(grouped.values()).sort(
+    (left, right) => new Date(right.last_seen).getTime() - new Date(left.last_seen).getTime(),
+  );
 }
 
 export function SessionsTableLive({
@@ -49,26 +102,46 @@ export function SessionsTableLive({
     let active = true;
     let socket: WebSocket | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const refreshSessions = async () => {
+      try {
+        const data = await apiFetch<PageData<RawSessionRow>>(
+          `/dashboard/sessions?project_id=${encodeURIComponent(projectId)}&page=${page}&page_size=${pageSize}`,
+        );
+        if (!active) return;
+        setRows(normalizeSessions(data.items));
+      } catch (err) {
+        debugLog("sessions refresh failed", err);
+      }
+    };
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        refreshSessions();
+      }, 600);
+    };
     const addEvent = (event: LiveEvent) => {
       if (!event.session_id || !event.timestamp) return;
       setRows((current) => {
         const existing = current.find((row) => row.session_id === event.session_id);
         const next = existing
           ? current.map((row) => row.session_id === event.session_id ? {
-              ...row,
-              user_id: row.user_id ?? event.user_id ?? null,
-              anonymous_id: row.anonymous_id ?? event.anonymous_id ?? null,
-              event_count: row.event_count + 1,
-              last_seen: event.timestamp!,
-            } : row)
+            ...row,
+            user_id: row.user_id ?? event.user_id ?? null,
+            anonymous_id: row.anonymous_id ?? event.anonymous_id ?? null,
+            event_count: row.event_count + 1,
+            last_seen: event.timestamp!,
+          } : row)
           : [{
-              session_id: event.session_id!,
-              user_id: event.user_id ?? null,
-              anonymous_id: event.anonymous_id ?? null,
-              event_count: 1,
-              first_seen: event.timestamp!,
-              last_seen: event.timestamp!,
-            }, ...current];
+            session_id: event.session_id!,
+            user_id: event.user_id ?? null,
+            anonymous_id: event.anonymous_id ?? null,
+            event_count: 1,
+            first_seen: event.timestamp!,
+            last_seen: event.timestamp!,
+          }, ...current];
         return next.sort((left, right) => new Date(right.last_seen).getTime() - new Date(left.last_seen).getTime());
       });
     };
@@ -94,7 +167,7 @@ export function SessionsTableLive({
             addEvent(message.data);
           }
           if (message.type === "event.deleted" || message.type === "events.deleted") {
-            // Live updates already handle additions; deletions will reconcile on navigation.
+            scheduleRefresh();
           }
         } catch (err) {
           debugLog("sessions ws message parse error", err);
@@ -111,9 +184,10 @@ export function SessionsTableLive({
     return () => {
       active = false;
       if (retryTimer) clearTimeout(retryTimer);
+      if (refreshTimer) clearTimeout(refreshTimer);
       socket?.close();
     };
-  }, [projectId]);
+  }, [page, pageSize, projectId]);
 
   const identifiedUsers = new Set(rows.map((row) => row.user_id).filter(Boolean)).size;
   const anonymousUsers = new Set(rows.map((row) => row.anonymous_id).filter(Boolean)).size;

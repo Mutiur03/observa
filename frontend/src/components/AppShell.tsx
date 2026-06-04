@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { BarChart3, Clock3, Gauge, GitBranch, KeyRound, LayoutDashboard, Lightbulb, ListTree, Menu, Radio, Settings, Users, Wifi, X, LogOut } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import type { Project } from "@/types";
@@ -39,9 +40,23 @@ export function AppShell({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [displayProjectName, setDisplayProjectName] = useState(projectName);
   const projectMenuRef = useRef<HTMLDivElement | null>(null);
+  const projectsQuery = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => apiFetch<Project[]>("/projects"),
+    enabled: Boolean(projectId),
+    initialData: initialProjects.length ? initialProjects : undefined,
+    staleTime: 60_000,
+  });
+  const projects = projectsQuery.data ?? initialProjects;
+  const projectFromList = projects.find((project) => project.id === projectId);
+  const projectQuery = useQuery({
+    queryKey: ["project", projectId],
+    queryFn: () => apiFetch<Project>(`/projects/${projectId}`),
+    enabled: Boolean(projectId && !projectName && !projectFromList),
+    staleTime: 60_000,
+  });
+  const displayProjectName = projectName ?? projectFromList?.name ?? projectQuery.data?.name;
 
   const activeLabel = useMemo(() => {
     if (!projectId) return "";
@@ -59,40 +74,6 @@ export function AppShell({
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    setProjects(initialProjects);
-  }, [initialProjects]);
-
-  useEffect(() => {
-    setDisplayProjectName(projectName);
-  }, [projectName]);
-
-  useEffect(() => {
-    if (!projectId) return;
-    let active = true;
-
-    apiFetch<Project[]>("/projects")
-      .then((nextProjects) => {
-        if (!active) return;
-        setProjects(nextProjects);
-        const current = nextProjects.find((project) => project.id === projectId);
-        if (current) setDisplayProjectName(current.name);
-      })
-      .catch(() => undefined);
-
-    if (!projectName) {
-      apiFetch<Project>(`/projects/${projectId}`)
-        .then((project) => {
-          if (active) setDisplayProjectName(project.name);
-        })
-        .catch(() => undefined);
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [projectId, projectName]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {

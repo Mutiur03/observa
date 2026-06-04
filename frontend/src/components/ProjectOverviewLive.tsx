@@ -134,13 +134,12 @@ function AutomatedInsightsPanel({ insights, href }: { insights: AutomatedInsight
                     {insights.map((insight, index) => (
                         <div
                             key={`${insight.kind}-${index}`}
-                            className={`rounded-md border p-3 ${
-                                insight.severity === "critical"
+                            className={`rounded-md border p-3 ${insight.severity === "critical"
                                     ? "border-red-200 bg-red-50"
                                     : insight.severity === "warning"
-                                      ? "border-amber-200 bg-amber-50"
-                                      : "border-emerald-200 bg-emerald-50"
-                            }`}
+                                        ? "border-amber-200 bg-amber-50"
+                                        : "border-emerald-200 bg-emerald-50"
+                                }`}
                         >
                             <div className="flex items-start gap-3">
                                 {insight.severity === "positive" ? <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden="true" />}
@@ -613,7 +612,7 @@ export function ProjectOverviewLive({
             if (refreshTimer) clearTimeout(refreshTimer);
             socket?.close();
         };
-    }, [projectId, router]);
+    }, [projectId, range, funnelSteps]);
 
     const eventsPath = `/projects/${projectId}/events`;
     const sessionsPath = `/projects/${projectId}/sessions`;
@@ -691,26 +690,26 @@ export function ProjectOverviewLive({
                 </div>
 
                 {showTraffic && <>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <InsightCard label="Page views" value={analytics.page_views} detail="Bot-filtered views in this window" icon={Globe2} tone="blue" href={eventTypeHref("page_view")} delta={pageViewsDelta} />
-                    <InsightCard label="Visitors" value={analytics.visitors} detail="Unique identified or anonymous visitors" icon={Users} tone="green" href={eventsPath} delta={visitorsDelta} />
-                    <InsightCard label="Bot traffic" value={analytics.bot_page_views} detail="Excluded from web analytics totals" icon={ShieldCheck} tone={analytics.bot_page_views ? "amber" : "ink"} href={searchHref("bot")} />
-                    <InsightCard label="Page sessions" value={analytics.sessions} detail="Sessions with page views" icon={Activity} href={sessionsPath} delta={compare ? comparisonData.sessions.change_percent : undefined} />
-                </div>
-
-                <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                    <div className="rounded-lg border border-border bg-surface p-4 shadow-sm">
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                            <div>
-                                <div className="text-sm font-semibold text-ink">Page views over time</div>
-                                <div className="text-sm text-muted">Last {analytics.series.length > 24 ? 24 : analytics.series.length || 0} points in this window</div>
-                            </div>
-                            <BarChart3 className="h-5 w-5 text-muted" aria-hidden="true" />
-                        </div>
-                        <MiniTrafficChart series={analytics.series} />
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <InsightCard label="Page views" value={analytics.page_views} detail="Bot-filtered views in this window" icon={Globe2} tone="blue" href={eventTypeHref("page_view")} delta={pageViewsDelta} />
+                        <InsightCard label="Visitors" value={analytics.visitors} detail="Unique identified or anonymous visitors" icon={Users} tone="green" href={eventsPath} delta={visitorsDelta} />
+                        <InsightCard label="Bot traffic" value={analytics.bot_page_views} detail="Excluded from web analytics totals" icon={ShieldCheck} tone={analytics.bot_page_views ? "amber" : "ink"} href={searchHref("bot")} />
+                        <InsightCard label="Page sessions" value={analytics.sessions} detail="Sessions with page views" icon={Activity} href={sessionsPath} delta={compare ? comparisonData.sessions.change_percent : undefined} />
                     </div>
-                    <BreakdownList title="Top pages" items={analytics.top_pages} empty="No page view events yet." hrefForItem={(item) => `/projects/${projectId}/pages?path=${encodeURIComponent(item.label)}${range !== "24h" ? `&range=${range}` : ""}`} />
-                </div>
+
+                    <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                        <div className="rounded-lg border border-border bg-surface p-4 shadow-sm">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <div>
+                                    <div className="text-sm font-semibold text-ink">Page views over time</div>
+                                    <div className="text-sm text-muted">Last {analytics.series.length > 24 ? 24 : analytics.series.length || 0} points in this window</div>
+                                </div>
+                                <BarChart3 className="h-5 w-5 text-muted" aria-hidden="true" />
+                            </div>
+                            <MiniTrafficChart series={analytics.series} />
+                        </div>
+                        <BreakdownList title="Top pages" items={analytics.top_pages} empty="No page view events yet." hrefForItem={(item) => `/projects/${projectId}/pages?path=${encodeURIComponent(item.label)}${range !== "24h" ? `&range=${range}` : ""}`} />
+                    </div>
                 </>}
 
                 {showPerformance && <WebVitalsPanel vitals={analytics.web_vitals} />}
