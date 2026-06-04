@@ -7,6 +7,7 @@ import { Activity, AlertTriangle, ArrowUpRight, BarChart3, CircleCheck, Flag, Ga
 
 import { AnalyticsControlBar } from "@/components/AnalyticsControlBar";
 import { PresencePanel } from "@/components/PresencePanel";
+import { apiFetch } from "@/lib/api";
 import { formatMetric } from "@/lib/format";
 import type { AnalyticsBreakdownItem, AnalyticsSummary, AutomatedInsight, FunnelSummary, OverviewStats, PeriodComparison, PresenceSnapshot } from "@/types";
 
@@ -443,6 +444,8 @@ export function ProjectOverviewLive({
     const [analytics, setAnalytics] = useState(initialAnalytics);
     const [funnel, setFunnel] = useState(initialFunnel);
     const [funnelStepsText, setFunnelStepsText] = useState(funnelSteps);
+    const [comparisonData, setComparisonData] = useState(comparison);
+    const [insightsData, setInsightsData] = useState(insights);
     const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
 
     useEffect(() => {
@@ -460,6 +463,14 @@ export function ProjectOverviewLive({
     useEffect(() => {
         setFunnelStepsText(funnelSteps);
     }, [funnelSteps]);
+
+    useEffect(() => {
+        setComparisonData(comparison);
+    }, [comparison]);
+
+    useEffect(() => {
+        setInsightsData(insights);
+    }, [insights]);
 
     const updateUrl = (nextRange: OverviewRange, nextSteps: string = funnelSteps) => {
         const params = new URLSearchParams();
@@ -535,12 +546,36 @@ export function ProjectOverviewLive({
         let socket: WebSocket | null = null;
         let retryTimer: ReturnType<typeof setTimeout> | undefined;
         let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+        let refreshInFlight = false;
 
-        const scheduleServerRefresh = () => {
+        const refreshAnalytics = async () => {
+            if (!active || refreshInFlight) return;
+            refreshInFlight = true;
+            const baseQuery = `project_id=${encodeURIComponent(projectId)}&range=${encodeURIComponent(range)}`;
+            try {
+                const [nextAnalytics, nextFunnel, nextComparison, nextInsights] = await Promise.all([
+                    apiFetch<AnalyticsSummary>(`/dashboard/analytics?${baseQuery}`),
+                    apiFetch<FunnelSummary>(`/dashboard/funnel?${baseQuery}&steps=${encodeURIComponent(funnelSteps)}`),
+                    apiFetch<PeriodComparison>(`/dashboard/comparison?${baseQuery}`),
+                    apiFetch<AutomatedInsight[]>(`/dashboard/insights?${baseQuery}`),
+                ]);
+                if (!active) return;
+                setAnalytics(nextAnalytics);
+                setFunnel(nextFunnel);
+                setComparisonData(nextComparison);
+                setInsightsData(nextInsights);
+            } catch (err) {
+                debugLog("analytics refresh failed", err);
+            } finally {
+                refreshInFlight = false;
+            }
+        };
+
+        const scheduleClientRefresh = () => {
             if (refreshTimer) clearTimeout(refreshTimer);
             refreshTimer = setTimeout(() => {
-                if (active) router.refresh();
-            }, 800);
+                refreshAnalytics();
+            }, 1000);
         };
 
         const connect = () => {
@@ -558,7 +593,7 @@ export function ProjectOverviewLive({
                 try {
                     const message = JSON.parse(event.data as string) as { type?: string };
                     if (message.type === "event.created" || message.type === "event.deleted" || message.type === "events.deleted") {
-                        scheduleServerRefresh();
+                        scheduleClientRefresh();
                     }
                 } catch {
                     // Ignore malformed websocket payloads.
@@ -584,8 +619,8 @@ export function ProjectOverviewLive({
     const sessionsPath = `/projects/${projectId}/sessions`;
     const eventTypeHref = (eventType: string) => `${eventsPath}?event_type=${encodeURIComponent(eventType)}`;
     const searchHref = (value: string) => `${eventsPath}?search=${encodeURIComponent(value)}`;
-    const pageViewsDelta = compare ? comparison.page_views.change_percent : undefined;
-    const visitorsDelta = compare ? comparison.visitors.change_percent : undefined;
+    const pageViewsDelta = compare ? comparisonData.page_views.change_percent : undefined;
+    const visitorsDelta = compare ? comparisonData.visitors.change_percent : undefined;
     const showSummary = view === "overview";
     const showTraffic = view === "overview" || view === "web";
     const showAudience = view === "audience";
@@ -601,7 +636,7 @@ export function ProjectOverviewLive({
                 <>
                     <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <InsightCard label="Active users" value={stats.active_users} detail={`People with events in ${rangeLabel[range]}`} icon={Users} tone="blue" href={eventsPath} delta={compare ? comparison.active_users.change_percent : undefined} />
+                            <InsightCard label="Active users" value={stats.active_users} detail={`People with events in ${rangeLabel[range]}`} icon={Users} tone="blue" href={eventsPath} delta={compare ? comparisonData.active_users.change_percent : undefined} />
                             <InsightCard label="New users" value={stats.new_users} detail="First seen during this window" icon={UserPlus} tone="green" href={`/projects/${projectId}/audience`} />
                             <InsightCard label="Online now" value={stats.online_users} detail={`${formatMetric(stats.active_sessions)} active live sessions`} icon={Wifi} href={`/projects/${projectId}/realtime`} />
                             <InsightCard label="Sessions" value={stats.sessions} detail="Unique tracked sessions" icon={Activity} href={sessionsPath} />
@@ -636,8 +671,8 @@ export function ProjectOverviewLive({
                 </>
             )}
 
-            {compare && (showSummary || view === "insights") && <PeriodComparisonPanel comparison={comparison} />}
-            {showInsights && <AutomatedInsightsPanel insights={showSummary ? insights.slice(0, 3) : insights} href={showSummary ? `/projects/${projectId}/insights` : undefined} />}
+            {compare && (showSummary || view === "insights") && <PeriodComparisonPanel comparison={comparisonData} />}
+            {showInsights && <AutomatedInsightsPanel insights={showSummary ? insightsData.slice(0, 3) : insightsData} href={showSummary ? `/projects/${projectId}/insights` : undefined} />}
 
             {(showTraffic || showAudience || showFunnels || showPerformance) && <section className="space-y-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -660,7 +695,7 @@ export function ProjectOverviewLive({
                     <InsightCard label="Page views" value={analytics.page_views} detail="Bot-filtered views in this window" icon={Globe2} tone="blue" href={eventTypeHref("page_view")} delta={pageViewsDelta} />
                     <InsightCard label="Visitors" value={analytics.visitors} detail="Unique identified or anonymous visitors" icon={Users} tone="green" href={eventsPath} delta={visitorsDelta} />
                     <InsightCard label="Bot traffic" value={analytics.bot_page_views} detail="Excluded from web analytics totals" icon={ShieldCheck} tone={analytics.bot_page_views ? "amber" : "ink"} href={searchHref("bot")} />
-                    <InsightCard label="Page sessions" value={analytics.sessions} detail="Sessions with page views" icon={Activity} href={sessionsPath} delta={compare ? comparison.sessions.change_percent : undefined} />
+                    <InsightCard label="Page sessions" value={analytics.sessions} detail="Sessions with page views" icon={Activity} href={sessionsPath} delta={compare ? comparisonData.sessions.change_percent : undefined} />
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">

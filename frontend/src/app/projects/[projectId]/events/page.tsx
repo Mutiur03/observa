@@ -25,6 +25,7 @@ export default async function Page({
   const pageSize = numberParam(query.page_size, 25, 10, 100);
   const data = await serverApiFetch<PageData<EventRow>>(
     `/dashboard/events?project_id=${projectId}&page=${page}&page_size=${pageSize}${event_type ? `&event_type=${encodeURIComponent(event_type)}` : ""}${anonymous_id ? `&anonymous_id=${encodeURIComponent(anonymous_id)}` : ""}${trace_id ? `&trace_id=${encodeURIComponent(trace_id)}` : ""}${user_id ? `&user_id=${encodeURIComponent(user_id)}` : ""}${session_id ? `&session_id=${encodeURIComponent(session_id)}` : ""}${search ? `&search=${encodeURIComponent(search)}` : ""}`,
+    { next: { revalidate: 2 } },
   );
   return <EventTablePage rows={data.items} total={data.total} page={data.page} pageSize={data.page_size} title="Events" filters={{ event_type, anonymous_id, trace_id, user_id, session_id }} initialSearch={search} syncSearchToUrl basePath={`/projects/${projectId}/events`} projectId={projectId} />;
 }

@@ -3,6 +3,6 @@ import { serverApiFetch } from "@/lib/server-api";
 
 export default async function MonitorsPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
-  const rows = await serverApiFetch<MonitorRow[]>(`/monitors?project_id=${projectId}`);
+  const rows = await serverApiFetch<MonitorRow[]>(`/monitors?project_id=${projectId}`, { next: { revalidate: 30 } });
   return <MonitorsPanel projectId={projectId} initialRows={rows} />;
 }

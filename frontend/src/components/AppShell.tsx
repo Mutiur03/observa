@@ -28,17 +28,19 @@ export function AppShell({
   projectId,
   projectName,
   userName,
-  projects,
+  projects: initialProjects = [],
 }: {
   children: ReactNode;
   projectId?: string;
   projectName?: string;
   userName?: string;
-  projects: Project[];
+  projects?: Project[];
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  const [displayProjectName, setDisplayProjectName] = useState(projectName);
   const projectMenuRef = useRef<HTMLDivElement | null>(null);
 
   const activeLabel = useMemo(() => {
@@ -57,6 +59,40 @@ export function AppShell({
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    setProjects(initialProjects);
+  }, [initialProjects]);
+
+  useEffect(() => {
+    setDisplayProjectName(projectName);
+  }, [projectName]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    let active = true;
+
+    apiFetch<Project[]>("/projects")
+      .then((nextProjects) => {
+        if (!active) return;
+        setProjects(nextProjects);
+        const current = nextProjects.find((project) => project.id === projectId);
+        if (current) setDisplayProjectName(current.name);
+      })
+      .catch(() => undefined);
+
+    if (!projectName) {
+      apiFetch<Project>(`/projects/${projectId}`)
+        .then((project) => {
+          if (active) setDisplayProjectName(project.name);
+        })
+        .catch(() => undefined);
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [projectId, projectName]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -95,10 +131,10 @@ export function AppShell({
               className="flex w-full items-center gap-3 rounded-lg border border-border bg-surface px-2 py-2 text-left shadow-sm transition hover:bg-surface-muted"
             >
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-ink text-xs font-bold text-white">
-                {projectName ? projectName.charAt(0).toUpperCase() : projectId.charAt(0).toUpperCase()}
+                {displayProjectName ? displayProjectName.charAt(0).toUpperCase() : projectId.charAt(0).toUpperCase()}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{projectName ?? `Project ${projectId}`}</span>
+                <span className="block truncate text-sm font-semibold">{displayProjectName ?? `Project ${projectId}`}</span>
               </span>
               <svg className={`h-4 w-4 shrink-0 transition ${projectMenuOpen ? "rotate-180" : ""}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />

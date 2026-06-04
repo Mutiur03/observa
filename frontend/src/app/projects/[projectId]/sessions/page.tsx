@@ -72,7 +72,10 @@ export default async function SessionsPage({
   const query = await searchParams;
   const page = numberParam(query.page, 1, 1, 100000);
   const pageSize = numberParam(query.page_size, 25, 10, 100);
-  const data = await serverApiFetch<PageData<RawSessionRow>>(`/dashboard/sessions?project_id=${projectId}&page=${page}&page_size=${pageSize}`);
+  const data = await serverApiFetch<PageData<RawSessionRow>>(
+    `/dashboard/sessions?project_id=${projectId}&page=${page}&page_size=${pageSize}`,
+    { next: { revalidate: 2 } },
+  );
   const sessions = normalizeSessions(data.items);
 
   return (

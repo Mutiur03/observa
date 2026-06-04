@@ -15,6 +15,15 @@ const emptyPresence: PresenceSnapshot = {
   visitors: [],
 };
 
+type DashboardBundle = {
+  stats: OverviewStats;
+  analytics: AnalyticsSummary;
+  funnel: FunnelSummary;
+  presence: PresenceSnapshot;
+  comparison: PeriodComparison;
+  insights: AutomatedInsight[];
+};
+
 function normalizeRange(value: string | string[] | undefined): OverviewRange {
   const range = Array.isArray(value) ? value[0] : value;
   return ranges.has(range ?? "") ? range as OverviewRange : "24h";
@@ -39,29 +48,25 @@ export default async function ProjectOverview({
   const compare = (Array.isArray(query.compare) ? query.compare[0] : query.compare) === "1";
   const baseQuery = `project_id=${encodeURIComponent(projectId)}&range=${encodeURIComponent(range)}`;
 
-  const [stats, analytics, funnel, presence, comparison, insights] = await Promise.all([
-    serverApiFetch<OverviewStats>(`/dashboard/overview?${baseQuery}`),
-    serverApiFetch<AnalyticsSummary>(`/dashboard/analytics?${baseQuery}`),
-    serverApiFetch<FunnelSummary>(`/dashboard/funnel?${baseQuery}&steps=${encodeURIComponent(funnelSteps)}`),
-    serverApiFetch<PresenceSnapshot>(`/dashboard/presence?project_id=${projectId}`).catch(() => emptyPresence),
-    serverApiFetch<PeriodComparison>(`/dashboard/comparison?${baseQuery}`),
-    serverApiFetch<AutomatedInsight[]>(`/dashboard/insights?${baseQuery}`),
-  ]);
+  const bundle = await serverApiFetch<DashboardBundle>(
+    `/dashboard/bundle?${baseQuery}&steps=${encodeURIComponent(funnelSteps)}`,
+    { next: { revalidate: 2 } },
+  );
 
   return (
     <>
       <h1 className="mb-5 text-2xl font-semibold">Project Overview</h1>
       <ProjectOverviewLive
         projectId={projectId}
-        initialStats={stats}
-        initialAnalytics={analytics}
-        initialFunnel={funnel}
-        initialPresence={presence}
+        initialStats={bundle.stats}
+        initialAnalytics={bundle.analytics}
+        initialFunnel={bundle.funnel}
+        initialPresence={bundle.presence ?? emptyPresence}
         range={range}
         funnelSteps={funnelSteps}
         compare={compare}
-        comparison={comparison}
-        insights={insights}
+        comparison={bundle.comparison}
+        insights={bundle.insights}
       />
     </>
   );

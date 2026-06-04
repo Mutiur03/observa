@@ -87,6 +87,26 @@ def analytics(
     return DashboardService(db).analytics(project_id, range_)
 
 
+@router.get("/bundle")
+def bundle(
+    project_id: str = Query(...),
+    range_: str = Query("24h", alias="range"),
+    steps: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    AuthorizationService(db).require_project_role(project_id, user, "viewer")
+    service = DashboardService(db)
+    return {
+        "stats": service.overview(project_id, range_),
+        "analytics": service.analytics(project_id, range_),
+        "funnel": service.funnel(project_id, range_, steps),
+        "presence": PresenceService().snapshot(project_id),
+        "comparison": service.period_comparison(project_id, range_),
+        "insights": service.insights(project_id, range_),
+    }
+
+
 @router.get("/page-detail")
 def page_detail(
     project_id: str = Query(...),

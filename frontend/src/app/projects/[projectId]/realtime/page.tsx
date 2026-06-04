@@ -1,6 +1,6 @@
 import { RealtimeAnalyticsLive } from "@/components/RealtimeAnalyticsLive";
 import { serverApiFetch } from "@/lib/server-api";
-import type { AnalyticsSummary, EventRow, OverviewStats, PresenceSnapshot } from "@/types";
+import type { AnalyticsSummary, AutomatedInsight, EventRow, FunnelSummary, OverviewStats, PeriodComparison, PresenceSnapshot } from "@/types";
 
 type PageData<T> = { items: T[]; total: number; page: number; page_size: number };
 
@@ -12,13 +12,26 @@ const emptyPresence: PresenceSnapshot = {
   visitors: [],
 };
 
+type DashboardBundle = {
+  stats: OverviewStats;
+  analytics: AnalyticsSummary;
+  funnel: FunnelSummary;
+  presence: PresenceSnapshot;
+  comparison: PeriodComparison;
+  insights: AutomatedInsight[];
+};
+
 export default async function RealtimePage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
-  const [stats, analytics, presence, events] = await Promise.all([
-    serverApiFetch<OverviewStats>(`/dashboard/overview?project_id=${projectId}&range=24h`),
-    serverApiFetch<AnalyticsSummary>(`/dashboard/analytics?project_id=${projectId}&range=24h`),
-    serverApiFetch<PresenceSnapshot>(`/dashboard/presence?project_id=${projectId}`).catch(() => emptyPresence),
-    serverApiFetch<PageData<EventRow>>(`/dashboard/events?project_id=${projectId}&page=1&page_size=50`),
+  const [bundle, events] = await Promise.all([
+    serverApiFetch<DashboardBundle>(
+      `/dashboard/bundle?project_id=${projectId}&range=24h`,
+      { next: { revalidate: 2 } },
+    ),
+    serverApiFetch<PageData<EventRow>>(
+      `/dashboard/events?project_id=${projectId}&page=1&page_size=50`,
+      { next: { revalidate: 2 } },
+    ),
   ]);
 
   return (
@@ -32,9 +45,9 @@ export default async function RealtimePage({ params }: { params: Promise<{ proje
       </div>
       <RealtimeAnalyticsLive
         projectId={projectId}
-        initialStats={stats}
-        initialAnalytics={analytics}
-        initialPresence={presence}
+        initialStats={bundle.stats}
+        initialAnalytics={bundle.analytics}
+        initialPresence={bundle.presence ?? emptyPresence}
         initialEvents={events.items}
       />
     </>

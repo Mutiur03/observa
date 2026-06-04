@@ -144,7 +144,6 @@ export function EventTablePage({
       socket.onopen = () => {
         if (!active) return;
         setConnectionState("live");
-        router.refresh();
       };
       socket.onmessage = (event) => {
         if (!active) return;
@@ -178,7 +177,7 @@ export function EventTablePage({
       if (retryTimer) clearTimeout(retryTimer);
       socket?.close();
     };
-  }, [projectId, router, search, stableFilters]);
+  }, [projectId, search, stableFilters]);
 
   useEffect(() => {
     if (selected) closeButtonRef.current?.focus();
@@ -189,7 +188,6 @@ export function EventTablePage({
     await apiFetch(`/dashboard/events/${id}?project_id=${encodeURIComponent(projectId)}`, { method: "DELETE" });
     setRows((current) => current.filter((row) => row.id !== id));
     setSelected(undefined);
-    router.refresh();
   }
 
   async function clearEvents() {
@@ -197,7 +195,6 @@ export function EventTablePage({
     if (!window.confirm(`Delete ${scope} permanently? This cannot be undone.`)) return;
     await apiFetch(`/dashboard/events?${queryString(projectId, stableFilters, search)}`, { method: "DELETE" });
     setRows([]);
-    router.refresh();
   }
 
   return (

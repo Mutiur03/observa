@@ -8,6 +8,15 @@ const ranges = new Set(["24h", "7d", "30d", "90d", "all"]);
 const defaultFunnelSteps = "page_view:*,custom_event:sign_up,custom_event:purchase";
 const emptyPresence: PresenceSnapshot = { online_users: 0, identified_users: 0, anonymous_users: 0, active_sessions: 0, visitors: [] };
 
+type DashboardBundle = {
+  stats: OverviewStats;
+  analytics: AnalyticsSummary;
+  funnel: FunnelSummary;
+  presence: PresenceSnapshot;
+  comparison: PeriodComparison;
+  insights: AutomatedInsight[];
+};
+
 function valueOf(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -30,14 +39,10 @@ export async function AnalyticsSectionPage({
   const funnelSteps = valueOf(searchParams.steps)?.trim() || defaultFunnelSteps;
   const compare = valueOf(searchParams.compare) === "1";
   const baseQuery = `project_id=${encodeURIComponent(projectId)}&range=${encodeURIComponent(range)}`;
-  const [stats, analytics, funnel, presence, comparison, insights] = await Promise.all([
-    serverApiFetch<OverviewStats>(`/dashboard/overview?${baseQuery}`),
-    serverApiFetch<AnalyticsSummary>(`/dashboard/analytics?${baseQuery}`),
-    serverApiFetch<FunnelSummary>(`/dashboard/funnel?${baseQuery}&steps=${encodeURIComponent(funnelSteps)}`),
-    serverApiFetch<PresenceSnapshot>(`/dashboard/presence?project_id=${projectId}`).catch(() => emptyPresence),
-    serverApiFetch<PeriodComparison>(`/dashboard/comparison?${baseQuery}`),
-    serverApiFetch<AutomatedInsight[]>(`/dashboard/insights?${baseQuery}`),
-  ]);
+  const bundle = await serverApiFetch<DashboardBundle>(
+    `/dashboard/bundle?${baseQuery}&steps=${encodeURIComponent(funnelSteps)}`,
+    { next: { revalidate: 2 } },
+  );
 
   return (
     <>
@@ -48,15 +53,15 @@ export async function AnalyticsSectionPage({
       </div>
       <ProjectOverviewLive
         projectId={projectId}
-        initialStats={stats}
-        initialAnalytics={analytics}
-        initialFunnel={funnel}
-        initialPresence={presence}
+        initialStats={bundle.stats}
+        initialAnalytics={bundle.analytics}
+        initialFunnel={bundle.funnel}
+        initialPresence={bundle.presence ?? emptyPresence}
         range={range}
         funnelSteps={funnelSteps}
         compare={compare}
-        comparison={comparison}
-        insights={insights}
+        comparison={bundle.comparison}
+        insights={bundle.insights}
         view={view}
       />
     </>

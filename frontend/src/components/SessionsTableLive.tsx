@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/DataTable";
 import { LiveConnectionStatus } from "@/components/LiveConnectionStatus";
 import { formatDateTime, formatMetric } from "@/lib/format";
@@ -39,7 +38,6 @@ export function SessionsTableLive({
   page: number;
   pageSize: number;
 }) {
-  const router = useRouter();
   const [rows, setRows] = useState(initialRows);
   const [connectionState, setConnectionState] = useState<"connecting" | "live" | "reconnecting">("connecting");
 
@@ -87,7 +85,6 @@ export function SessionsTableLive({
       socket.onopen = () => {
         if (!active) return;
         setConnectionState("live");
-        router.refresh();
       };
       socket.onmessage = (event) => {
         if (!active) return;
@@ -97,7 +94,7 @@ export function SessionsTableLive({
             addEvent(message.data);
           }
           if (message.type === "event.deleted" || message.type === "events.deleted") {
-            router.refresh();
+            // Live updates already handle additions; deletions will reconcile on navigation.
           }
         } catch (err) {
           debugLog("sessions ws message parse error", err);
@@ -116,7 +113,7 @@ export function SessionsTableLive({
       if (retryTimer) clearTimeout(retryTimer);
       socket?.close();
     };
-  }, [projectId, router]);
+  }, [projectId]);
 
   const identifiedUsers = new Set(rows.map((row) => row.user_id).filter(Boolean)).size;
   const anonymousUsers = new Set(rows.map((row) => row.anonymous_id).filter(Boolean)).size;

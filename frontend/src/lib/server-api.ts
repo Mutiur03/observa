@@ -6,11 +6,17 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ??
   "http://localhost:8000";
 
-export async function serverApiFetch<T>(path: string): Promise<T> {
+export async function serverApiFetch<T>(
+  path: string,
+  init: RequestInit & { next?: { revalidate?: number } } = {},
+): Promise<T> {
   const cookieStore = await cookies();
+  const headers = new Headers(init.headers);
+  headers.set("Cookie", cookieStore.toString());
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { Cookie: cookieStore.toString() },
-    cache: "no-store",
+    ...init,
+    headers,
+    next: init.next ?? { revalidate: 5 },
   });
 
   if (response.status === 401) redirect("/login");
