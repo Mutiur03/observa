@@ -413,14 +413,21 @@ function reportWebVital(name: string, value: number, rating: "good" | "needs-imp
 }
 
 function observeLargestContentfulPaint() {
+  let lcp = 0;
+  let reported = false;
   try {
     const observer = new PerformanceObserver((list) => {
       const entries = list.getEntries();
       const entry = entries[entries.length - 1] as PerformanceEntry & { renderTime?: number; loadTime?: number };
-      const value = entry.renderTime || entry.loadTime || entry.startTime;
-      reportWebVital("LCP", value, rateLcp(value));
+      lcp = entry.renderTime || entry.loadTime || entry.startTime;
     });
     observer.observe({ type: "largest-contentful-paint", buffered: true });
+    reportWhenPageHides(() => {
+      if (reported || !lcp) return;
+      reported = true;
+      observer.disconnect();
+      reportWebVital("LCP", lcp, rateLcp(lcp));
+    });
   } catch {
     // Some browsers do not support this metric.
   }
@@ -428,14 +435,20 @@ function observeLargestContentfulPaint() {
 
 function observeCumulativeLayoutShift() {
   let cls = 0;
+  let reported = false;
   try {
     const observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries() as Array<PerformanceEntry & { value?: number; hadRecentInput?: boolean }>) {
         if (!entry.hadRecentInput) cls += entry.value ?? 0;
       }
-      reportWebVital("CLS", cls, rateCls(cls));
     });
     observer.observe({ type: "layout-shift", buffered: true });
+    reportWhenPageHides(() => {
+      if (reported) return;
+      reported = true;
+      observer.disconnect();
+      reportWebVital("CLS", cls, rateCls(cls));
+    });
   } catch {
     // Some browsers do not support this metric.
   }
@@ -443,17 +456,39 @@ function observeCumulativeLayoutShift() {
 
 function observeInteractionToNextPaint() {
   let inp = 0;
+  let reported = false;
   try {
     const observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
         inp = Math.max(inp, entry.duration);
       }
-      reportWebVital("INP", inp, rateInp(inp));
     });
     observer.observe({ type: "event", buffered: true, durationThreshold: 40 } as PerformanceObserverInit);
+    reportWhenPageHides(() => {
+      if (reported || !inp) return;
+      reported = true;
+      observer.disconnect();
+      reportWebVital("INP", inp, rateInp(inp));
+    });
   } catch {
     // Some browsers do not support this metric.
   }
+}
+
+function reportWhenPageHides(report: () => void) {
+  let reported = false;
+  const flush = () => {
+    if (reported) return;
+    reported = true;
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    window.removeEventListener("pagehide", flush);
+    report();
+  };
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") flush();
+  };
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  window.addEventListener("pagehide", flush);
 }
 
 function reportNavigationTiming() {

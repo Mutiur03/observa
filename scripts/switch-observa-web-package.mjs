@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const mode = process.argv[2];
-const releaseVersion = process.argv[3] ?? process.env.OBSERVA_WEB_RELEASE_VERSION ?? "^0.1.7";
+const releaseVersion = process.argv[3] ?? process.env.OBSERVA_WEB_RELEASE_VERSION ?? "^0.1.8";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const frontend = path.join(root, "frontend");
 const localPackage = path.join(root, "packages", "observa-web");
