@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DataTable } from "@/components/DataTable";
 import { LiveConnectionStatus } from "@/components/LiveConnectionStatus";
+import { formatTime } from "@/lib/format";
 import type { PresenceSnapshot } from "@/types";
 
 function getWsBaseUrl() {
@@ -78,7 +79,7 @@ export function PresencePanel({ projectId, initialPresence }: { projectId: strin
             render: (row) => <Link className="underline decoration-border underline-offset-4" href={`/projects/${projectId}/sessions/${encodeURIComponent(row.session_id)}`}>{row.session_id}</Link>,
           },
           { key: "page", label: "Current page", render: (row) => row.path ?? "-" },
-          { key: "seen", label: "Last seen", render: (row) => new Date(row.last_seen).toLocaleTimeString() },
+          { key: "seen", label: "Last seen", render: (row) => formatTime(row.last_seen) },
         ]}
       />
     </section>

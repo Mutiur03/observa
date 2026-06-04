@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DataTable } from "@/components/DataTable";
 import { LiveConnectionStatus } from "@/components/LiveConnectionStatus";
 import type { EventRow } from "@/types";
 import { apiFetch } from "@/lib/api";
+import { formatDateTime, formatMetric } from "@/lib/format";
 
 type EventFilters = {
   event_type?: string;
@@ -44,7 +46,7 @@ function matches(row: EventRow, filters: EventFilters, search: string) {
     .some((value) => value!.toLowerCase().includes(search.toLowerCase()));
 }
 
-function queryString(projectId: string, filters: EventFilters, search: string) {
+function queryString(projectId: string, filters: EventFilters, search = "") {
   const params = new URLSearchParams({ project_id: projectId });
   Object.entries(filters).forEach(([key, value]) => {
     if (value) params.set(key, value);
@@ -55,24 +57,36 @@ function queryString(projectId: string, filters: EventFilters, search: string) {
 
 export function EventTablePage({
   rows: initialRows,
+  total,
+  page,
+  pageSize,
   title,
   basePath,
   projectId,
   filters = {},
   description = "Search activity, inspect context, or drill into a user, session, or trace.",
   showTypeFilters = true,
+  initialSearch = "",
+  syncSearchToUrl = false,
 }: {
   rows: EventRow[];
+  total?: number;
+  page?: number;
+  pageSize?: number;
   title: string;
   basePath: string;
   projectId: string;
   filters?: EventFilters;
   description?: string;
   showTypeFilters?: boolean;
+  initialSearch?: string;
+  syncSearchToUrl?: boolean;
 }) {
+  const router = useRouter();
+  const currentSearchParams = useSearchParams();
   const [rows, setRows] = useState<EventRow[]>(initialRows);
   const [selected, setSelected] = useState<EventRow>();
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [connectionState, setConnectionState] = useState<"connecting" | "live" | "reconnecting">("connecting");
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const stableFilters = useMemo(() => filters, [filters.anonymous_id, filters.event_type, filters.session_id, filters.trace_id, filters.user_id]);
@@ -84,46 +98,53 @@ export function EventTablePage({
     ["frontend_error", "Frontend error"],
     ["backend_error", "Backend error"],
   ];
+  const uniqueUsers = new Set(rows.map((row) => row.user_id ?? row.anonymous_id).filter(Boolean)).size;
+  const uniqueSessions = new Set(rows.map((row) => row.session_id).filter(Boolean)).size;
+  const errorRows = rows.filter((row) => row.event_type.includes("error")).length;
+  const currentPage = page ?? 1;
+  const currentPageSize = pageSize ?? 25;
+  const totalRows = total ?? rows.length;
 
   useEffect(() => {
     setRows(initialRows);
   }, [initialRows]);
 
   useEffect(() => {
+    setSearch(initialSearch);
+  }, [initialSearch]);
+
+  useEffect(() => {
+    if (!syncSearchToUrl) return;
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams();
+      Object.entries(stableFilters).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+      });
+      if (search) params.set("search", search);
+      const nextSearch = params.toString();
+      if (nextSearch !== currentSearchParams.toString()) {
+        router.replace(`${basePath}${nextSearch ? `?${nextSearch}` : ""}`);
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [basePath, currentSearchParams, router, search, stableFilters, syncSearchToUrl]);
+
+  useEffect(() => {
     let active = true;
     let socket: WebSocket | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    let pollTimer: ReturnType<typeof setInterval> | undefined;
-
-    const refresh = async () => {
-      try {
-        const data = await apiFetch<{ items: EventRow[] }>(`/dashboard/events?${queryString(projectId, stableFilters, search)}`);
-        if (active) setRows(data.items);
-      } catch (err) {
-        debugLog("events refresh error", err);
-      }
-    };
-    const startPolling = () => {
-      if (pollTimer) return;
-      setConnectionState("reconnecting");
-      pollTimer = setInterval(refresh, 3000);
-    };
-    const stopPolling = () => {
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = undefined;
-    };
     const connect = () => {
       if (!active) return;
       try {
         socket = new WebSocket(`${getWsBaseUrl()}/dashboard/events/ws?project_id=${encodeURIComponent(projectId)}`);
       } catch {
-        startPolling();
+        setConnectionState("reconnecting");
         return;
       }
       socket.onopen = () => {
         if (!active) return;
         setConnectionState("live");
-        stopPolling();
+        router.refresh();
       };
       socket.onmessage = (event) => {
         if (!active) return;
@@ -146,20 +167,18 @@ export function EventTablePage({
       };
       socket.onclose = () => {
         if (!active) return;
-        startPolling();
+        setConnectionState("reconnecting");
         retryTimer = setTimeout(connect, 5000);
       };
       socket.onerror = () => socket?.close();
     };
-    refresh();
     connect();
     return () => {
       active = false;
-      stopPolling();
       if (retryTimer) clearTimeout(retryTimer);
       socket?.close();
     };
-  }, [projectId, search, stableFilters]);
+  }, [projectId, router, search, stableFilters]);
 
   useEffect(() => {
     if (selected) closeButtonRef.current?.focus();
@@ -170,6 +189,7 @@ export function EventTablePage({
     await apiFetch(`/dashboard/events/${id}?project_id=${encodeURIComponent(projectId)}`, { method: "DELETE" });
     setRows((current) => current.filter((row) => row.id !== id));
     setSelected(undefined);
+    router.refresh();
   }
 
   async function clearEvents() {
@@ -177,6 +197,7 @@ export function EventTablePage({
     if (!window.confirm(`Delete ${scope} permanently? This cannot be undone.`)) return;
     await apiFetch(`/dashboard/events?${queryString(projectId, stableFilters, search)}`, { method: "DELETE" });
     setRows([]);
+    router.refresh();
   }
 
   return (
@@ -191,6 +212,12 @@ export function EventTablePage({
         <button onClick={clearEvents} className="w-full rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-sm font-medium text-danger sm:w-auto">
           Clear filtered events
         </button>
+      </div>
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <InfoTile label="Events shown" value={rows.length} />
+        <InfoTile label="Users" value={uniqueUsers} />
+        <InfoTile label="Sessions" value={uniqueSessions} />
+        <InfoTile label="Errors" value={errorRows} />
       </div>
       <div className="mb-4 rounded-xl border border-border bg-surface p-3 shadow-sm">
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -247,7 +274,7 @@ export function EventTablePage({
             label: "Session",
             render: (row) => row.session_id ? <Link className="underline decoration-border underline-offset-4" href={`/projects/${projectId}/sessions/${encodeURIComponent(row.session_id)}`}>{row.session_id}</Link> : "-",
           },
-          { key: "time", label: "Time", render: (row) => new Date(row.timestamp).toLocaleString() },
+          { key: "time", label: "Time", render: (row) => formatDateTime(row.timestamp) },
           {
             key: "actions",
             label: "",
@@ -255,6 +282,7 @@ export function EventTablePage({
           },
         ]}
       />
+      <Pagination basePath={basePath} filters={stableFilters} search={search} page={currentPage} pageSize={currentPageSize} total={totalRows} />
       {selected && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Event details dialog" onKeyDown={(event) => { if (event.key === "Escape") setSelected(undefined); }}>
           <div className="max-h-[86vh] w-full max-w-3xl overflow-auto rounded-lg border border-border bg-surface p-4 shadow-2xl">
@@ -267,5 +295,52 @@ export function EventTablePage({
         </div>
       )}
     </>
+  );
+}
+
+function Pagination({
+  basePath,
+  filters,
+  search,
+  page,
+  pageSize,
+  total,
+}: {
+  basePath: string;
+  filters: EventFilters;
+  search: string;
+  page: number;
+  pageSize: number;
+  total: number;
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const hrefFor = (nextPage: number) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    if (search) params.set("search", search);
+    if (nextPage > 1) params.set("page", String(nextPage));
+    params.set("page_size", String(pageSize));
+    return `${basePath}?${params}`;
+  };
+
+  return (
+    <div className="mt-4 flex flex-col gap-3 rounded-lg border border-border bg-surface p-3 text-sm shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="text-muted">Page {page} of {totalPages} · {formatMetric(total)} total</div>
+      <div className="flex gap-2">
+        <Link className={`rounded-md border border-border px-3 py-1.5 ${page <= 1 ? "pointer-events-none opacity-50" : "hover:bg-surface-muted"}`} href={hrefFor(Math.max(1, page - 1))}>Previous</Link>
+        <Link className={`rounded-md border border-border px-3 py-1.5 ${page >= totalPages ? "pointer-events-none opacity-50" : "hover:bg-surface-muted"}`} href={hrefFor(Math.min(totalPages, page + 1))}>Next</Link>
+      </div>
+    </div>
+  );
+}
+
+function InfoTile({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface p-4 shadow-sm">
+      <div className="text-xs font-semibold uppercase text-muted">{label}</div>
+      <div className="mt-2 text-2xl font-semibold text-ink">{value}</div>
+    </div>
   );
 }

@@ -48,9 +48,21 @@ export function MonitorsPanel({ projectId, initialRows }: { projectId: string; i
     router.refresh();
   }
 
+  const activeMonitors = rows.filter((row) => row.is_active).length;
+  const inactiveMonitors = rows.length - activeMonitors;
+
   return (
     <>
-      <h1 className="mb-5 text-2xl font-semibold">Monitors</h1>
+      <div className="mb-5">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">Uptime checks</p>
+        <h1 className="mt-1 text-2xl font-semibold">Monitors</h1>
+        <p className="mt-1 text-sm text-muted">Track important endpoints and run manual checks when something looks off.</p>
+      </div>
+      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        <InfoTile label="Monitors" value={rows.length} />
+        <InfoTile label="Active" value={activeMonitors} />
+        <InfoTile label="Inactive" value={inactiveMonitors} />
+      </div>
       <form onSubmit={create} className="mb-5 grid gap-3 rounded-md border border-border bg-surface p-4 md:grid-cols-[1fr_2fr_120px_auto]">
         <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="https://api.example.com/health" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} />
@@ -67,5 +79,14 @@ export function MonitorsPanel({ projectId, initialRows }: { projectId: string; i
         { key: "action", label: "", render: (row) => <div className="flex flex-wrap gap-2"><button className="rounded-md border border-border px-3 py-1 text-sm" onClick={() => checkNow(row.id)}>Check</button><button className="rounded-md border border-border px-3 py-1 text-sm" onClick={() => deleteMonitor(row.id)}>Delete</button></div> },
       ]} />
     </>
+  );
+}
+
+function InfoTile({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface p-4 shadow-sm">
+      <div className="text-xs font-semibold uppercase text-muted">{label}</div>
+      <div className="mt-2 text-2xl font-semibold text-ink">{value}</div>
+    </div>
   );
 }

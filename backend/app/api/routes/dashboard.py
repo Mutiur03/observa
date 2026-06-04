@@ -56,6 +56,63 @@ def overview(
     return DashboardService(db).overview(project_id, range_)
 
 
+@router.get("/analytics")
+def analytics(
+    project_id: str = Query(...),
+    range_: str = Query("24h", alias="range"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    AuthorizationService(db).require_project_role(project_id, user, "viewer")
+    return DashboardService(db).analytics(project_id, range_)
+
+
+@router.get("/page-detail")
+def page_detail(
+    project_id: str = Query(...),
+    path: str = Query(..., min_length=1),
+    range_: str = Query("24h", alias="range"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    AuthorizationService(db).require_project_role(project_id, user, "viewer")
+    return DashboardService(db).page_detail(project_id, path, range_)
+
+
+@router.get("/comparison")
+def comparison(
+    project_id: str = Query(...),
+    range_: str = Query("24h", alias="range"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    AuthorizationService(db).require_project_role(project_id, user, "viewer")
+    return DashboardService(db).period_comparison(project_id, range_)
+
+
+@router.get("/insights")
+def insights(
+    project_id: str = Query(...),
+    range_: str = Query("24h", alias="range"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    AuthorizationService(db).require_project_role(project_id, user, "viewer")
+    return DashboardService(db).insights(project_id, range_)
+
+
+@router.get("/funnel")
+def funnel(
+    project_id: str = Query(...),
+    range_: str = Query("24h", alias="range"),
+    steps: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    AuthorizationService(db).require_project_role(project_id, user, "viewer")
+    return DashboardService(db).funnel(project_id, range_, steps)
+
+
 @router.websocket("/overview/ws")
 async def overview_stream(websocket: WebSocket, project_id: str = Query(...), range_: str = Query("24h", alias="range")):
     db = SessionLocal()
@@ -326,6 +383,12 @@ def sessions(project_id: str, page: int = 1, page_size: int = 25, user: User = D
 def user_timeline(user_id: str, project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     AuthorizationService(db).require_project_role(project_id, user, "viewer")
     return DashboardService(db).timeline(project_id, user_id)
+
+
+@router.get("/users/{user_id}/profile")
+def user_profile(user_id: str, project_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    AuthorizationService(db).require_project_role(project_id, user, "viewer")
+    return DashboardService(db).user_profile(project_id, user_id)
 
 
 @router.get("/projects/{project_id}/stats")

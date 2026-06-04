@@ -4,6 +4,7 @@ type AutoTrackOptions = {
   fetch?: boolean;
   sessions?: boolean;
   presence?: boolean;
+  webVitals?: boolean;
 };
 
 export { Observa } from "./react.js";
@@ -58,6 +59,7 @@ export function init(input: string | InitOptions) {
     if (config.autoTrack.fetch) installFetchTracking();
     if (config.autoTrack.sessions) installSessionTracking();
     if (config.autoTrack.presence) installPresenceTracking();
+    if (config.autoTrack.webVitals) installWebVitalsTracking();
   }
 
   if (config.autoTrack.pageViews) void capturePageView();
@@ -88,6 +90,9 @@ export function track(
 
 export function capturePageView(properties: Record<string, unknown> = {}) {
   if (typeof window === "undefined") return Promise.resolve();
+  const currentUrl = new URL(window.location.href);
+  const referrerUrl = parseUrl(document.referrer);
+  const bot = detectBot();
   return send("/events", {
     event_type: "page_view",
     event_name: window.location.pathname,
@@ -98,7 +103,19 @@ export function capturePageView(properties: Record<string, unknown> = {}) {
       path: window.location.pathname,
       title: document.title,
       referrer: document.referrer,
+      referrer_host: referrerUrl?.host || "Direct",
       url: window.location.href,
+      host: currentUrl.host,
+      utm_source: currentUrl.searchParams.get("utm_source") || undefined,
+      utm_medium: currentUrl.searchParams.get("utm_medium") || undefined,
+      utm_campaign: currentUrl.searchParams.get("utm_campaign") || undefined,
+      traffic_channel: classifyTrafficChannel(currentUrl, referrerUrl),
+      browser: detectBrowser(),
+      os: detectOs(),
+      device_type: detectDeviceType(),
+      user_agent: navigator.userAgent,
+      is_bot: bot.isBot,
+      bot_name: bot.name,
       ...properties,
     },
   });
@@ -148,7 +165,7 @@ async function send(path: string, body: Record<string, unknown>) {
 
 function resolveAutoTrack(input: boolean | AutoTrackOptions | undefined): Required<AutoTrackOptions> {
   if (input === false) {
-    return { pageViews: false, errors: false, fetch: false, sessions: false, presence: false };
+    return { pageViews: false, errors: false, fetch: false, sessions: false, presence: false, webVitals: false };
   }
   const partial = typeof input === "object" ? input : {};
   return {
@@ -157,6 +174,7 @@ function resolveAutoTrack(input: boolean | AutoTrackOptions | undefined): Requir
     fetch: partial.fetch ?? false,
     sessions: partial.sessions ?? true,
     presence: partial.presence ?? true,
+    webVitals: partial.webVitals ?? true,
   };
 }
 
@@ -361,6 +379,192 @@ function shouldPropagateTrace(url: string) {
 function normalizeError(error: unknown) {
   if (error instanceof Error) return error;
   return new Error(String(error));
+}
+
+function installWebVitalsTracking() {
+  if (typeof window === "undefined" || typeof PerformanceObserver === "undefined") return;
+  observeLargestContentfulPaint();
+  observeCumulativeLayoutShift();
+  observeInteractionToNextPaint();
+  reportNavigationTiming();
+}
+
+function reportWebVital(name: string, value: number, rating: "good" | "needs-improvement" | "poor") {
+  if (!Number.isFinite(value) || value < 0) return;
+  void track("web_vital", {
+    name,
+    value: Math.round(value * 100) / 100,
+    rating,
+    path: typeof window !== "undefined" ? window.location.pathname : undefined,
+  });
+}
+
+function observeLargestContentfulPaint() {
+  try {
+    const observer = new PerformanceObserver((list) => {
+      const entries = list.getEntries();
+      const entry = entries[entries.length - 1] as PerformanceEntry & { renderTime?: number; loadTime?: number };
+      const value = entry.renderTime || entry.loadTime || entry.startTime;
+      reportWebVital("LCP", value, rateLcp(value));
+    });
+    observer.observe({ type: "largest-contentful-paint", buffered: true });
+  } catch {
+    // Some browsers do not support this metric.
+  }
+}
+
+function observeCumulativeLayoutShift() {
+  let cls = 0;
+  try {
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries() as Array<PerformanceEntry & { value?: number; hadRecentInput?: boolean }>) {
+        if (!entry.hadRecentInput) cls += entry.value ?? 0;
+      }
+      reportWebVital("CLS", cls, rateCls(cls));
+    });
+    observer.observe({ type: "layout-shift", buffered: true });
+  } catch {
+    // Some browsers do not support this metric.
+  }
+}
+
+function observeInteractionToNextPaint() {
+  let inp = 0;
+  try {
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        inp = Math.max(inp, entry.duration);
+      }
+      reportWebVital("INP", inp, rateInp(inp));
+    });
+    observer.observe({ type: "event", buffered: true, durationThreshold: 40 } as PerformanceObserverInit);
+  } catch {
+    // Some browsers do not support this metric.
+  }
+}
+
+function reportNavigationTiming() {
+  const report = () => {
+    const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    if (!navigation) return;
+    reportWebVital("TTFB", navigation.responseStart - navigation.requestStart, rateTtfb(navigation.responseStart - navigation.requestStart));
+    if (navigation.loadEventEnd > 0) {
+      reportWebVital("Page Load", navigation.loadEventEnd - navigation.startTime, ratePageLoad(navigation.loadEventEnd - navigation.startTime));
+    }
+  };
+
+  if (document.readyState === "complete") report();
+  else window.addEventListener("load", () => setTimeout(report, 0), { once: true });
+}
+
+function parseUrl(value: string) {
+  if (!value) return null;
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
+function detectDeviceType() {
+  if (typeof navigator === "undefined") return "Unknown";
+  const ua = navigator.userAgent;
+  if (/ipad|tablet|playbook|silk/i.test(ua)) return "Tablet";
+  if (/mobile|iphone|ipod|android.*mobile|blackberry|iemobile/i.test(ua)) return "Mobile";
+  return "Desktop";
+}
+
+function detectBot() {
+  if (typeof navigator === "undefined") return { isBot: false, name: undefined };
+  const ua = navigator.userAgent.toLowerCase();
+  const patterns = [
+    ["Googlebot", /googlebot/],
+    ["Bingbot", /bingbot/],
+    ["DuckDuckBot", /duckduckbot/],
+    ["YandexBot", /yandexbot/],
+    ["Baiduspider", /baiduspider/],
+    ["FacebookBot", /facebookexternalhit|facebot/],
+    ["TwitterBot", /twitterbot/],
+    ["LinkedInBot", /linkedinbot/],
+    ["Generic Bot", /bot|crawler|spider|crawling|slurp|preview/],
+  ] as const;
+
+  const match = patterns.find(([, pattern]) => pattern.test(ua));
+  return { isBot: Boolean(match), name: match?.[0] };
+}
+
+function classifyTrafficChannel(currentUrl: URL, referrerUrl: URL | null) {
+  const source = currentUrl.searchParams.get("utm_source")?.toLowerCase() ?? "";
+  const medium = currentUrl.searchParams.get("utm_medium")?.toLowerCase() ?? "";
+  const referrerHost = referrerUrl?.hostname.toLowerCase() ?? "";
+
+  if (["cpc", "ppc", "paid", "paid_social", "display", "ad", "ads"].some((value) => medium.includes(value))) return "Paid";
+  if (medium.includes("email") || source.includes("newsletter")) return "Email";
+  if (isSocialHost(source) || isSocialHost(referrerHost) || medium.includes("social")) return "Social";
+  if (isSearchHost(referrerHost) || medium.includes("organic")) return "Organic Search";
+  if (!referrerHost) return "Direct";
+  if (referrerHost === currentUrl.hostname.toLowerCase()) return "Internal";
+  return "Referral";
+}
+
+function isSearchHost(value: string) {
+  return /(^|\.)google\.|(^|\.)bing\.|(^|\.)yahoo\.|(^|\.)duckduckgo\.|(^|\.)baidu\.|(^|\.)yandex\./.test(value);
+}
+
+function isSocialHost(value: string) {
+  return /facebook|instagram|twitter|x\.com|linkedin|tiktok|pinterest|reddit|youtube/.test(value);
+}
+
+function detectBrowser() {
+  if (typeof navigator === "undefined") return "Unknown";
+  const ua = navigator.userAgent;
+  if (/edg\//i.test(ua)) return "Edge";
+  if (/opr\//i.test(ua)) return "Opera";
+  if (/firefox\//i.test(ua)) return "Firefox";
+  if (/safari\//i.test(ua) && !/chrome|chromium|crios/i.test(ua)) return "Safari";
+  if (/chrome|chromium|crios/i.test(ua)) return "Chrome";
+  return "Other";
+}
+
+function detectOs() {
+  if (typeof navigator === "undefined") return "Unknown";
+  const ua = navigator.userAgent;
+  if (/windows/i.test(ua)) return "Windows";
+  if (/iphone|ipad|ipod/i.test(ua)) return "iOS";
+  if (/android/i.test(ua)) return "Android";
+  if (/mac os x|macintosh/i.test(ua)) return "macOS";
+  if (/linux/i.test(ua)) return "Linux";
+  return "Other";
+}
+
+function rateLcp(value: number) {
+  if (value <= 2500) return "good";
+  if (value <= 4000) return "needs-improvement";
+  return "poor";
+}
+
+function rateCls(value: number) {
+  if (value <= 0.1) return "good";
+  if (value <= 0.25) return "needs-improvement";
+  return "poor";
+}
+
+function rateInp(value: number) {
+  if (value <= 200) return "good";
+  if (value <= 500) return "needs-improvement";
+  return "poor";
+}
+
+function rateTtfb(value: number) {
+  if (value <= 800) return "good";
+  if (value <= 1800) return "needs-improvement";
+  return "poor";
+}
+
+function ratePageLoad(value: number) {
+  if (value <= 3000) return "good";
+  if (value <= 6000) return "needs-improvement";
+  return "poor";
 }
 
 function debounce(fn: () => void, timeout: number) {

@@ -41,16 +41,29 @@ export function ApiKeysPanel({ projectId, initialKeys }: { projectId: string; in
   const presenceSnippet = createdKeyType === "public" && createdKey
     ? `<script src="${presenceScriptUrl}" data-api-key="${createdKey}" defer></script>`
     : `<script src="${presenceScriptUrl}" data-api-key="obspk_YOUR_PUBLIC_KEY" defer></script>`;
+  const activeKeys = keys.filter((key) => key.is_active).length;
+  const publicKeys = keys.filter((key) => key.key_type === "public").length;
+  const secretKeys = keys.filter((key) => key.key_type === "secret").length;
 
   return (
     <>
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-semibold">API Keys</h1>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">Project access</p>
+          <h1 className="mt-1 text-2xl font-semibold">API Keys</h1>
+          <p className="mt-1 text-sm text-muted">Use public keys for browser tracking and secret keys for backend ingestion.</p>
+        </div>
         <div className="grid gap-2 sm:grid-cols-[minmax(180px,1fr)_auto_auto]">
           <input className="min-w-0 rounded-md border border-border px-3 py-2 text-sm" value={keyName} onChange={(event) => setKeyName(event.target.value)} />
           <button onClick={() => createKey("public")} className="rounded-md border border-border bg-surface px-3 py-2 text-sm hover:bg-surface-muted">Public key</button>
           <button onClick={() => createKey("secret")} className="rounded-md bg-brand px-3 py-2 text-sm text-white hover:bg-brand-strong">Secret key</button>
         </div>
+      </div>
+      <div className="mb-5 grid gap-3 sm:grid-cols-4">
+        <InfoTile label="Keys" value={keys.length} />
+        <InfoTile label="Active" value={activeKeys} />
+        <InfoTile label="Public" value={publicKeys} />
+        <InfoTile label="Secret" value={secretKeys} />
       </div>
       {createdKey && <div className="mb-4 rounded-md border border-info/20 bg-info-soft p-4 text-sm text-info">New key: <code className="break-all">{createdKey}</code></div>}
       {error && <div className="mb-4 rounded-md border border-danger/20 bg-danger-soft p-4 text-sm text-danger">{error}</div>}
@@ -68,5 +81,14 @@ export function ApiKeysPanel({ projectId, initialKeys }: { projectId: string; in
         { key: "action", label: "", render: (row) => row.is_active ? <button className="rounded-md border border-border px-3 py-1 text-sm" onClick={() => revokeKey(row.id)}>Revoke</button> : "-" },
       ]} />
     </>
+  );
+}
+
+function InfoTile({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface p-4 shadow-sm">
+      <div className="text-xs font-semibold uppercase text-muted">{label}</div>
+      <div className="mt-2 text-2xl font-semibold text-ink">{value}</div>
+    </div>
   );
 }

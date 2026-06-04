@@ -35,9 +35,21 @@ export function AlertsPanel({ projectId, initialRows }: { projectId: string; ini
     router.refresh();
   }
 
+  const activeRules = rows.filter((row) => row.is_active).length;
+  const thresholdRules = rows.filter((row) => row.rule_type.includes("threshold")).length;
+
   return (
     <>
-      <h1 className="mb-5 text-2xl font-semibold">Alerts</h1>
+      <div className="mb-5">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">Incident rules</p>
+        <h1 className="mt-1 text-2xl font-semibold">Alerts</h1>
+        <p className="mt-1 text-sm text-muted">Create rules for errors, monitor failures, slow endpoints, jobs, and webhook delivery problems.</p>
+      </div>
+      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        <InfoTile label="Rules" value={rows.length} />
+        <InfoTile label="Active" value={activeRules} />
+        <InfoTile label="Threshold-based" value={thresholdRules} />
+      </div>
       <form onSubmit={create} className="mb-5 grid gap-3 rounded-md border border-border bg-surface p-4 md:grid-cols-[1fr_220px_120px_auto]">
         <input className="rounded-md border border-border px-3 py-2 text-sm" placeholder="Rule name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
         <select className="rounded-md border border-border px-3 py-2 text-sm" value={form.rule_type} onChange={(e) => setForm({ ...form, rule_type: e.target.value })}>
@@ -55,5 +67,14 @@ export function AlertsPanel({ projectId, initialRows }: { projectId: string; ini
         { key: "action", label: "", render: (row) => <button className="rounded-md border border-border px-3 py-1 text-sm" onClick={() => deleteRule(row.id)}>Delete</button> },
       ]} />
     </>
+  );
+}
+
+function InfoTile({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-lg border border-border bg-surface p-4 shadow-sm">
+      <div className="text-xs font-semibold uppercase text-muted">{label}</div>
+      <div className="mt-2 text-2xl font-semibold text-ink">{value}</div>
+    </div>
   );
 }

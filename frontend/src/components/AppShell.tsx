@@ -4,12 +4,18 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { Clock3, Gauge, KeyRound, LayoutDashboard, ListTree, Menu, Settings, Wifi, X, LogOut } from "lucide-react";
+import { BarChart3, Clock3, Gauge, GitBranch, KeyRound, LayoutDashboard, Lightbulb, ListTree, Menu, Radio, Settings, Users, Wifi, X, LogOut } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import type { Project } from "@/types";
 
 const nav = [
   ["Overview", LayoutDashboard, ""],
+  ["Realtime", Radio, "realtime"],
+  ["Web Analytics", BarChart3, "web-analytics"],
+  ["Audience", Users, "audience"],
+  ["Funnels", GitBranch, "funnels"],
+  ["Performance", Gauge, "performance"],
+  ["Insights", Lightbulb, "insights"],
   ["Events", ListTree, "events"],
   ["Sessions", Clock3, "sessions"],
   ["Monitors", Wifi, "monitors"],

@@ -1,4 +1,4 @@
-import { ProjectOverviewLive } from "@/components/ProjectOverviewLive";
+import { ProjectOverviewLive, type AnalyticsView } from "@/components/ProjectOverviewLive";
 import { serverApiFetch } from "@/lib/server-api";
 import type { AnalyticsSummary, AutomatedInsight, FunnelSummary, OverviewStats, PeriodComparison, PresenceSnapshot } from "@/types";
 
@@ -6,39 +6,30 @@ type OverviewRange = "24h" | "7d" | "30d" | "90d" | "all";
 
 const ranges = new Set(["24h", "7d", "30d", "90d", "all"]);
 const defaultFunnelSteps = "page_view:*,custom_event:sign_up,custom_event:purchase";
+const emptyPresence: PresenceSnapshot = { online_users: 0, identified_users: 0, anonymous_users: 0, active_sessions: 0, visitors: [] };
 
-const emptyPresence: PresenceSnapshot = {
-  online_users: 0,
-  identified_users: 0,
-  anonymous_users: 0,
-  active_sessions: 0,
-  visitors: [],
-};
-
-function normalizeRange(value: string | string[] | undefined): OverviewRange {
-  const range = Array.isArray(value) ? value[0] : value;
-  return ranges.has(range ?? "") ? range as OverviewRange : "24h";
+function valueOf(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
-function normalizeSteps(value: string | string[] | undefined) {
-  const steps = Array.isArray(value) ? value[0] : value;
-  return steps?.trim() || defaultFunnelSteps;
-}
-
-export default async function ProjectOverview({
-  params,
+export async function AnalyticsSectionPage({
+  projectId,
   searchParams,
+  view,
+  title,
+  description,
 }: {
-  params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ range?: string | string[]; steps?: string | string[]; compare?: string | string[] }>;
+  projectId: string;
+  searchParams: { range?: string | string[]; steps?: string | string[]; compare?: string | string[] };
+  view: AnalyticsView;
+  title: string;
+  description: string;
 }) {
-  const { projectId } = await params;
-  const query = await searchParams;
-  const range = normalizeRange(query.range);
-  const funnelSteps = normalizeSteps(query.steps);
-  const compare = (Array.isArray(query.compare) ? query.compare[0] : query.compare) === "1";
+  const rawRange = valueOf(searchParams.range);
+  const range = (ranges.has(rawRange ?? "") ? rawRange : "24h") as OverviewRange;
+  const funnelSteps = valueOf(searchParams.steps)?.trim() || defaultFunnelSteps;
+  const compare = valueOf(searchParams.compare) === "1";
   const baseQuery = `project_id=${encodeURIComponent(projectId)}&range=${encodeURIComponent(range)}`;
-
   const [stats, analytics, funnel, presence, comparison, insights] = await Promise.all([
     serverApiFetch<OverviewStats>(`/dashboard/overview?${baseQuery}`),
     serverApiFetch<AnalyticsSummary>(`/dashboard/analytics?${baseQuery}`),
@@ -50,7 +41,11 @@ export default async function ProjectOverview({
 
   return (
     <>
-      <h1 className="mb-5 text-2xl font-semibold">Project Overview</h1>
+      <div className="mb-5">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">Analytics</p>
+        <h1 className="mt-1 text-2xl font-semibold">{title}</h1>
+        <p className="mt-1 text-sm text-muted">{description}</p>
+      </div>
       <ProjectOverviewLive
         projectId={projectId}
         initialStats={stats}
@@ -62,6 +57,7 @@ export default async function ProjectOverview({
         compare={compare}
         comparison={comparison}
         insights={insights}
+        view={view}
       />
     </>
   );

@@ -2,6 +2,8 @@ import { SessionsTableLive } from "@/components/SessionsTableLive";
 import { serverApiFetch } from "@/lib/server-api";
 import type { SessionSummaryRow } from "@/types";
 
+type PageData<T> = { items: T[]; total: number; page: number; page_size: number };
+
 type RawSessionRow = {
   session_id?: string;
   user_id?: string | null;
@@ -11,6 +13,13 @@ type RawSessionRow = {
   last_seen?: string;
   timestamp?: string;
 };
+
+function numberParam(value: string | string[] | undefined, fallback: number, min: number, max: number) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(parsed)));
+}
 
 function normalizeSessions(rows: RawSessionRow[]): SessionSummaryRow[] {
   const grouped = new Map<string, SessionSummaryRow>();
@@ -52,9 +61,18 @@ function normalizeSessions(rows: RawSessionRow[]): SessionSummaryRow[] {
   );
 }
 
-export default async function SessionsPage({ params }: { params: Promise<{ projectId: string }> }) {
+export default async function SessionsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ page?: string; page_size?: string }>;
+}) {
   const { projectId } = await params;
-  const data = await serverApiFetch<{ items: RawSessionRow[] }>(`/dashboard/sessions?project_id=${projectId}`);
+  const query = await searchParams;
+  const page = numberParam(query.page, 1, 1, 100000);
+  const pageSize = numberParam(query.page_size, 25, 10, 100);
+  const data = await serverApiFetch<PageData<RawSessionRow>>(`/dashboard/sessions?project_id=${projectId}&page=${page}&page_size=${pageSize}`);
   const sessions = normalizeSessions(data.items);
 
   return (
@@ -67,7 +85,7 @@ export default async function SessionsPage({ params }: { params: Promise<{ proje
         <p className="text-sm text-muted">Open a session to see every event collected inside it.</p>
       </div>
 
-      <SessionsTableLive projectId={projectId} initialRows={sessions} />
+      <SessionsTableLive projectId={projectId} initialRows={sessions} total={data.total} page={data.page} pageSize={data.page_size} />
     </>
   );
 }
